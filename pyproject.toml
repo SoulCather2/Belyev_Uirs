@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "belyev-uirs"
+version = "0.1.0"
+description = "Terrain classification and kinetic-energy analysis using DCT models."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.7",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+]
+
+[tool.setuptools]
+py-modules = ["Osnova"]
