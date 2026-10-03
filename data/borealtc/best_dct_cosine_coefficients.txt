@@ -1,0 +1,106 @@
+Best Optuna trial: 29
+Accuracy: 0.964912
+Configuration: window_size=15, n_bins=87, n_dct_coefficients=23, memory_margin=0.4637154977
+
+Nonzero DCT coefficients before cosine terms
+=============================================
+
+ASPHALT
+-------
+k= 1 | coefficient=44.11313785 | cosine multiplier=1*pi/87
+k= 2 | coefficient=176.6124111 | cosine multiplier=2*pi/87
+k= 3 | coefficient=-30.76129656 | cosine multiplier=3*pi/87
+k= 4 | coefficient=-127.0214536 | cosine multiplier=4*pi/87
+k= 6 | coefficient=67.92251361 | cosine multiplier=6*pi/87
+k= 7 | coefficient=-12.85267882 | cosine multiplier=7*pi/87
+k= 8 | coefficient=-58.95593265 | cosine multiplier=8*pi/87
+k= 9 | coefficient=-26.14354709 | cosine multiplier=9*pi/87
+k=10 | coefficient=-14.28367525 | cosine multiplier=10*pi/87
+k=11 | coefficient=23.63581767 | cosine multiplier=11*pi/87
+k=12 | coefficient=-19.83393117 | cosine multiplier=12*pi/87
+k=13 | coefficient=13.15196069 | cosine multiplier=13*pi/87
+k=14 | coefficient=14.80770453 | cosine multiplier=14*pi/87
+k=15 | coefficient=24.96578812 | cosine multiplier=15*pi/87
+k=19 | coefficient=-26.45421362 | cosine multiplier=19*pi/87
+k=20 | coefficient=24.33728521 | cosine multiplier=20*pi/87
+k=23 | coefficient=-6.930991093 | cosine multiplier=23*pi/87
+k=24 | coefficient=9.66460108 | cosine multiplier=24*pi/87
+k=25 | coefficient=-12.62214165 | cosine multiplier=25*pi/87
+k=28 | coefficient=-7.085381525 | cosine multiplier=28*pi/87
+k=44 | coefficient=7.418483965 | cosine multiplier=44*pi/87
+k=46 | coefficient=6.755231852 | cosine multiplier=46*pi/87
+
+FLOORING
+--------
+k= 2 | coefficient=167.1748001 | cosine multiplier=2*pi/87
+k= 3 | coefficient=10.82234768 | cosine multiplier=3*pi/87
+k= 4 | coefficient=-91.60085377 | cosine multiplier=4*pi/87
+k= 5 | coefficient=-9.810250064 | cosine multiplier=5*pi/87
+k= 6 | coefficient=28.42243995 | cosine multiplier=6*pi/87
+k= 7 | coefficient=-8.954951353 | cosine multiplier=7*pi/87
+k= 8 | coefficient=-8.50101787 | cosine multiplier=8*pi/87
+k=10 | coefficient=-4.185961859 | cosine multiplier=10*pi/87
+k=11 | coefficient=-4.512478161 | cosine multiplier=11*pi/87
+k=12 | coefficient=6.895184413 | cosine multiplier=12*pi/87
+k=14 | coefficient=-12.37365352 | cosine multiplier=14*pi/87
+k=16 | coefficient=-8.443108611 | cosine multiplier=16*pi/87
+k=18 | coefficient=-8.695745286 | cosine multiplier=18*pi/87
+k=19 | coefficient=7.162619502 | cosine multiplier=19*pi/87
+k=20 | coefficient=-5.99957114 | cosine multiplier=20*pi/87
+k=21 | coefficient=-4.543470477 | cosine multiplier=21*pi/87
+k=22 | coefficient=-9.737389598 | cosine multiplier=22*pi/87
+k=25 | coefficient=2.604571795 | cosine multiplier=25*pi/87
+k=26 | coefficient=-2.928908526 | cosine multiplier=26*pi/87
+k=27 | coefficient=-3.585724996 | cosine multiplier=27*pi/87
+k=45 | coefficient=-2.194576317 | cosine multiplier=45*pi/87
+k=47 | coefficient=2.53302691 | cosine multiplier=47*pi/87
+
+ICE
+---
+k= 1 | coefficient=-8.216122815 | cosine multiplier=1*pi/87
+k= 2 | coefficient=5.483193397 | cosine multiplier=2*pi/87
+k= 3 | coefficient=14.46630483 | cosine multiplier=3*pi/87
+k= 4 | coefficient=-7.047072048 | cosine multiplier=4*pi/87
+k= 5 | coefficient=-6.088127754 | cosine multiplier=5*pi/87
+k= 6 | coefficient=2.346559589 | cosine multiplier=6*pi/87
+k= 7 | coefficient=16.87276498 | cosine multiplier=7*pi/87
+k= 8 | coefficient=6.807417034 | cosine multiplier=8*pi/87
+k= 9 | coefficient=-7.066131985 | cosine multiplier=9*pi/87
+k=10 | coefficient=4.151256143 | cosine multiplier=10*pi/87
+k=11 | coefficient=6.200767831 | cosine multiplier=11*pi/87
+k=12 | coefficient=-12.58991078 | cosine multiplier=12*pi/87
+k=13 | coefficient=-2.642105893 | cosine multiplier=13*pi/87
+k=14 | coefficient=8.009914498 | cosine multiplier=14*pi/87
+k=17 | coefficient=-9.589217503 | cosine multiplier=17*pi/87
+k=18 | coefficient=8.079813381 | cosine multiplier=18*pi/87
+k=21 | coefficient=3.049506539 | cosine multiplier=21*pi/87
+k=22 | coefficient=4.025309484 | cosine multiplier=22*pi/87
+k=23 | coefficient=-6.108460399 | cosine multiplier=23*pi/87
+k=27 | coefficient=2.826921952 | cosine multiplier=27*pi/87
+k=28 | coefficient=-2.286077042 | cosine multiplier=28*pi/87
+k=29 | coefficient=-2.243504167 | cosine multiplier=29*pi/87
+
+SNOW
+----
+k= 1 | coefficient=17.82412286 | cosine multiplier=1*pi/87
+k= 2 | coefficient=90.97477399 | cosine multiplier=2*pi/87
+k= 3 | coefficient=49.1852221 | cosine multiplier=3*pi/87
+k= 4 | coefficient=-39.12001713 | cosine multiplier=4*pi/87
+k= 5 | coefficient=-30.12385748 | cosine multiplier=5*pi/87
+k= 6 | coefficient=16.21852307 | cosine multiplier=6*pi/87
+k= 8 | coefficient=-13.71557699 | cosine multiplier=8*pi/87
+k= 9 | coefficient=-15.31201186 | cosine multiplier=9*pi/87
+k=10 | coefficient=17.78702964 | cosine multiplier=10*pi/87
+k=12 | coefficient=-7.948543954 | cosine multiplier=12*pi/87
+k=13 | coefficient=-17.65640968 | cosine multiplier=13*pi/87
+k=15 | coefficient=8.855511414 | cosine multiplier=15*pi/87
+k=16 | coefficient=-28.85039487 | cosine multiplier=16*pi/87
+k=17 | coefficient=-6.15703519 | cosine multiplier=17*pi/87
+k=19 | coefficient=8.974117597 | cosine multiplier=19*pi/87
+k=21 | coefficient=7.265741211 | cosine multiplier=21*pi/87
+k=22 | coefficient=-27.055844 | cosine multiplier=22*pi/87
+k=25 | coefficient=-14.36972305 | cosine multiplier=25*pi/87
+k=26 | coefficient=-6.22805258 | cosine multiplier=26*pi/87
+k=28 | coefficient=-10.46069433 | cosine multiplier=28*pi/87
+k=29 | coefficient=6.726130365 | cosine multiplier=29*pi/87
+k=43 | coefficient=6.386558558 | cosine multiplier=43*pi/87
