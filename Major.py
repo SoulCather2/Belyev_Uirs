@@ -1,6 +1,6 @@
 from pathlib import Path
 import pickle
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,6 @@ from scipy.fft import dct
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.model_selection import GroupKFold
 
 
 @dataclass(frozen=True)
@@ -615,89 +614,6 @@ def classify_experiments_by_dct(
     return pd.DataFrame(rows)
 
 
-def classify_experiments_leave_one_out(
-    data: pd.DataFrame,
-    config: PipelineConfig,
-    grid: np.ndarray,
-    omega_limit: float,
-) -> pd.DataFrame:
-    """Evaluate each original experiment against models trained without it."""
-    rows = []
-    ordered_groups = data[list(config.group_columns)].drop_duplicates().sort_values("run_idx")
-    previous_prediction = None
-    
-    for group in ordered_groups.itertuples(index=False):
-        group_mask = (data["terrain"] == group.terrain) & (data["run_idx"] == group.run_idx)
-        training_data = data.loc[~group_mask]
-        
-        _, _, models, models_std = calculate_dct_coefficients(training_data, config, grid, omega_limit)
-        
-        prediction = classify_experiments_by_dct(
-            data.loc[group_mask], models, models_std, config,
-            initial_prediction=previous_prediction
-        )
-        if prediction.empty:
-            continue
-            
-        prediction.loc[:, "previous_prediction"] = previous_prediction
-        rows.append(prediction.iloc[0])
-        previous_prediction = prediction.iloc[0]["predicted_terrain"]
-        
-    return pd.DataFrame(rows)
-
-
-def select_dct_coefficients(
-    data: pd.DataFrame,
-    candidates: list[int],
-    config: PipelineConfig,
-    grid: np.ndarray,
-    omega_limit: float,
-    n_splits: int = 5,
-) -> tuple[int, pd.DataFrame]:
-    """Select the DCT cutoff using grouped cross-validation by experiment."""
-    groups = data["terrain"].astype(str) + "::" + data["run_idx"].astype(str)
-    n_splits = min(n_splits, groups.nunique())
-    if n_splits < 2:
-        raise ValueError("At least two experiments are required for cross-validation")
-
-    folds = list(GroupKFold(n_splits=n_splits).split(data, groups=groups))
-    rows = []
-    for cutoff in candidates:
-        candidate_config = replace(config, n_dct_coefficients=cutoff)
-        fold_scores = []
-        for train_indices, test_indices in folds:
-            train_data = data.iloc[train_indices]
-            test_data = data.iloc[test_indices]
-            _, _, models, models_std = calculate_dct_coefficients(
-                train_data, candidate_config, grid, omega_limit
-            )
-            predictions = classify_experiments_by_dct(
-                test_data, models, models_std, candidate_config
-            )
-            if predictions.empty:
-                continue
-            report = classification_report(
-                predictions["terrain"], predictions["predicted_terrain"],
-                output_dict=True, zero_division=0,
-            )
-            fold_scores.append(
-                {
-                    "accuracy": accuracy_score(predictions["terrain"], predictions["predicted_terrain"]),
-                    "macro_f1": report["macro avg"]["f1-score"],
-                }
-            )
-        average = pd.DataFrame(fold_scores).mean()
-        rows.append(
-            {
-                "n_coefficients": cutoff,
-                "cv_accuracy": average["accuracy"],
-                "cv_macro_f1": average["macro_f1"],
-            }
-        )
-    results = pd.DataFrame(rows).sort_values(["cv_macro_f1", "cv_accuracy"], ascending=False)
-    return int(results.iloc[0]["n_coefficients"]), results
-
-
 def generate_classification_report(
     classification: pd.DataFrame, 
     output_dir: Path | None = None
@@ -833,8 +749,10 @@ def main() -> None:
     )
     plot_terrain_ranges(features, output_path=terrain_ranges_path)
     
-    # 10. Run leave-one-experiment-out classification.
-    classification = classify_experiments_leave_one_out(cleaned, config, grid, omega_limit)
+    # 10. Classify experiments using models trained on all cleaned data.
+    classification = classify_experiments_by_dct(
+        cleaned, dct_models, dct_models_std, config
+    )
     classification.to_csv(classification_path, index=False)
     
     # 11. Calculate metrics and reports.
