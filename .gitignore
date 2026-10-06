@@ -1,8 +1,13 @@
 .venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
 
 # Generated model and intermediate data.
 data/borealtc/dct_models.pkl
 data/borealtc/motion_splits/
 data/borealtc/merged_interpolation_features_filtered.csv
+
+# Local Optuna runtime state and trial history.
+data/borealtc/optuna_dct.db
+data/borealtc/dct_hyperparameter_trials.csv
