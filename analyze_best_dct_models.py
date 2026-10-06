@@ -44,10 +44,10 @@ def train_best_models(data_dir: Path) -> tuple[dict, dict, PipelineConfig, dict]
     config, result = load_best_config(data_dir)
     raw_data = pd.read_csv(data_dir / "merged_interpolation.csv")
     raw_data = raw_data[raw_data["terrain"] != "SANDY_LOAM"].copy()
-    features = calculate_features(raw_data, config)
+    filtered_motion = filter_by_experiment(raw_data, config)
+    features = calculate_features(filtered_motion, config)
     grid, omega_limit = build_symmetric_grid(features, config)
-    filtered = filter_by_experiment(features, config)
-    cleaned = remove_ke_outliers(filtered, config)
+    cleaned = remove_ke_outliers(features, config)
     split_data = split_by_motion(cleaned, grid, omega_limit)
     training_data = pd.concat(split_data.values(), ignore_index=True)
     _, _, models, _ = calculate_dct_coefficients(

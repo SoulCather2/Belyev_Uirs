@@ -56,16 +56,17 @@ def effective_parameters(trial: optuna.Trial) -> dict[str, int | float]:
 
 
 def build_objective(raw_data: pd.DataFrame) -> callable:
-    """Build an objective with feature calculation shared by every trial."""
+    """Build an objective that recalculates Ke for every trial window."""
     base_config = PipelineConfig()
-    features = calculate_features(raw_data, base_config)
 
     def objective(trial: optuna.Trial) -> float:
         parameters = effective_parameters(trial)
         config = replace(base_config, **parameters)
+        # Важно: окно сначала фильтрует исходные vel/cur, и только потом считается Ke.
+        filtered_motion = filter_by_experiment(raw_data, config)
+        features = calculate_features(filtered_motion, config)
         grid, omega_limit = build_symmetric_grid(features, config)
-        filtered = filter_by_experiment(features, config)
-        cleaned = remove_ke_outliers(filtered, config)
+        cleaned = remove_ke_outliers(features, config)
 
         split_data = split_by_motion(cleaned, grid, omega_limit)
         training_data = pd.concat(split_data.values(), ignore_index=True)

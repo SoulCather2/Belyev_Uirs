@@ -10,13 +10,6 @@ import numpy as np
 import pandas as pd
 
 
-LATEX_HEADER = r"""\documentclass{article}
-\usepackage{amsmath}
-\usepackage[margin=1in]{geometry}
-\begin{document}
-"""
-LATEX_FOOTER = r"""\end{document}
-"""
 HTML_TEMPLATE = """<!doctype html>
 <html lang="en">
 <head>
@@ -156,7 +149,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        help="Write a complete LaTeX document to this path instead of printing fragments.",
+        help="Write rendered HTML formulas to this path instead of printing fragments.",
     )
     parser.add_argument(
         "--zero-tolerance",
@@ -167,18 +160,15 @@ def main() -> None:
     args = parser.parse_args()
 
     formulas = load_formulas(args.data_dir, args.zero_tolerance)
-    content = "\n\n".join(formulas)
     if args.output is None:
-        print(content)
+        print("\n\n".join(formulas))
         return
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if args.output.suffix.lower() == ".html":
-        args.output.write_text(render_html(formulas), encoding="utf-8")
-        print(f"Saved rendered HTML formulas to {args.output}")
-    else:
-        args.output.write_text(LATEX_HEADER + content + "\n" + LATEX_FOOTER, encoding="utf-8")
-        print(f"Saved LaTeX formulas to {args.output}")
+    if args.output.suffix.lower() != ".html":
+        raise ValueError("--output must use the .html extension")
+    args.output.write_text(render_html(formulas), encoding="utf-8")
+    print(f"Saved rendered HTML formulas to {args.output}")
 
 
 if __name__ == "__main__":
