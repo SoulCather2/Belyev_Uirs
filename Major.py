@@ -13,19 +13,19 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 @dataclass(frozen=True)
 class PipelineConfig:
-    window_size: int = 10
+    window_size: int = 30
     track_width: float = 0.6
     wheel_radius: float = 0.13
     motor_resistance: float = 0.46
     motor_back_emf: float = 0.141 / np.pi
     no_load_current: float = 1.35
-    n_bins: int = 51
-    n_dct_coefficients: int = 10
+    n_bins: int = 71
+    n_dct_coefficients: int = 28
     model_smoothing_window: int = 9
     model_smoothing_polyorder: int = 2
     std_score_weight: float = 0.5
     std_floor: float = 0.25
-    memory_margin: float = 0.5
+    memory_margin: float = 0.32952224820710885
     omega_limit: float = 0.5
     terrain_omega_limits: dict[str, float] = field(default_factory=dict)
     motion_columns: tuple[str, ...] = ("wx", "wy", "wz", "ax", "ay", "az", "velL", "velR", "curL", "curR")
@@ -721,8 +721,17 @@ def generate_classification_report(
     
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
+        report_intro = (
+            "Project stage summary\n"
+            "=====================\n"
+            "Earlier stages prepared filtered motion data, DCT surface models, "
+            "and Optuna hyperparameter search.\n"
+            "This stage evaluates the likelihood-based surface classifier with "
+            "probability memory on the filtered experiments.\n\n"
+        )
         (output_dir / "classification_report.txt").write_text(
-            f"Accuracy: {accuracy:.6f}\n\n{report_text}", encoding="utf-8"
+            report_intro + f"Accuracy: {accuracy:.6f}\n\n{report_text}",
+            encoding="utf-8",
         )
         report_df.to_csv(output_dir / "classification_report.csv")
         (output_dir / "classification_accuracy.txt").write_text(f"{accuracy:.6f}\n", encoding="utf-8")
@@ -797,11 +806,15 @@ def main() -> None:
     cleaned = remove_ke_outliers(features, config)
     cleaned.to_csv(output_path, index=False)
     print(f"Saved filtered dataframe to {output_path}")
+
+    # Обучение идет на разбитых motion-данных, а проверка ниже - на cleaned.
+    split_data = split_by_motion(cleaned, grid, omega_limit)
+    training_data = pd.concat(split_data.values(), ignore_index=True)
     
-    # 5. Calculate final DCT models and standard deviations.
+    # 5. Calculate final DCT models and standard deviations from split data.
     print(f"Using {config.n_dct_coefficients} DCT coefficients")
     median_ke, coefficients, dct_models, dct_models_std = calculate_dct_coefficients(
-        cleaned, config, grid, omega_limit
+        training_data, config, grid, omega_limit
     )
     
     # 7. Define output paths.
@@ -836,7 +849,7 @@ def main() -> None:
     )
     plot_terrain_ranges(features, output_path=terrain_ranges_path)
     
-    # 10. Classify experiments using models trained on all cleaned data.
+    # 10. Classify real cleaned experiments with models trained on split data.
     classification = classify_experiments_by_dct(
         cleaned, dct_models, dct_models_std, config
     )

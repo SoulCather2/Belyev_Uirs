@@ -11,3 +11,7 @@ data/borealtc/merged_interpolation_features_filtered.csv
 # Local Optuna runtime state and trial history.
 data/borealtc/optuna_dct.db
 data/borealtc/dct_hyperparameter_trials.csv
+
+# Local raw datasets.
+data/borealtc/merged_interpolation.csv
+data/borealtc/*.csv.gz

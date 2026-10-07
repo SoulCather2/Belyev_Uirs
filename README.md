@@ -2,6 +2,10 @@
 
 This project analyzes vehicle motion measurements across terrain types and estimates the normalized kinetic-energy coefficient (`Ke`). The pipeline filters raw measurements, recalculates `Ke` for each filtering window, removes outliers, aggregates values on a symmetric angular-velocity grid, fits discrete cosine transform (DCT) models, and classifies terrain surfaces.
 
+## Project stage
+
+Earlier stages prepared the filtered motion data, DCT surface models, analytical formulas, and Optuna search. The current stage evaluates the likelihood-based classifier with probability memory on filtered experiments and documents the resulting metrics and model formulas.
+
 ## Run
 
 Install the project dependencies and run the main pipeline:
