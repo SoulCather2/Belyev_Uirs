@@ -53,8 +53,6 @@ def signed_term(coefficient: float, expression: str) -> str:
 def model_formula(
     surface: str,
     coefficients: pd.DataFrame,
-    alpha_min: float,
-    alpha_max: float,
     zero_tolerance: float,
 ) -> str:
     """Build one analytic DCT formula for a terrain surface."""
@@ -76,14 +74,10 @@ def model_formula(
         if index == 0:
             terms.append(rf"\frac{{{format_number(coefficient)}}}{{2}}")
             continue
-        alpha_coordinate = (
-            rf"\frac{{{size - 1}\left(\alpha {'-' if alpha_min >= 0 else '+'} {format_number(abs(alpha_min))}\right)}}"
-            rf"{{{format_number(alpha_max - alpha_min)}}}"
-        )
         cosine = (
-            rf"\cos\left[\frac{{\pi \cdot {index}}}{{{size}}}"
-            rf"\left({alpha_coordinate} + \frac{{1}}{{2}}\right)\right]"
-        )
+                rf"\cos\left[\frac{{{index}\pi}}{{{size}}}"
+            rf"\left(\alpha + \frac{{1}}{{2}}\right)\right]"
+            )
         terms.append(signed_term(coefficient, cosine))
 
     body = "".join(terms)
@@ -104,17 +98,8 @@ def load_formulas(data_dir: Path, zero_tolerance: float) -> list[str]:
 
     formulas = []
     for surface, surface_coefficients in coefficients.groupby("terrain", sort=True):
-        surface_grid = grid.loc[grid["terrain"] == surface, "omega_bin"]
-        if surface_grid.empty:
-            raise ValueError(f"No omega grid found for {surface!r}")
         formulas.append(
-            model_formula(
-                str(surface),
-                surface_coefficients,
-                float(surface_grid.min()),
-                float(surface_grid.max()),
-                zero_tolerance,
-            )
+        model_formula(str(surface), surface_coefficients, zero_tolerance)
         )
     return formulas
 

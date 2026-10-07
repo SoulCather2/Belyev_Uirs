@@ -72,6 +72,28 @@ def coefficient_table(models: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def alpha_table(models: dict) -> pd.DataFrame:
+    """Return every alpha-grid value and its normalized DCT coordinate."""
+    rows = []
+    for surface, model in sorted(models.items()):
+        grid = model.omega_grid
+        alpha_min = float(grid.min())
+        alpha_max = float(grid.max())
+        for index, alpha in enumerate(grid):
+            normalized = (index / (len(grid) - 1)) if len(grid) > 1 else 0.0
+            rows.append(
+                {
+                    "terrain": surface,
+                    "alpha_index": index,
+                    "alpha": float(alpha),
+                    "alpha_min": alpha_min,
+                    "alpha_max": alpha_max,
+                    "normalized_alpha": normalized,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def summarize_similarity(coefficients: pd.DataFrame) -> str:
     """Describe common DCT positions and pairwise overlap."""
     positions = {
@@ -158,6 +180,9 @@ def main() -> None:
     models, _, config, result = train_best_models(args.data_dir)
     coefficients = coefficient_table(models)
     coefficients.to_csv(args.data_dir / "best_dct2_coefficients.csv", index=False)
+    alpha_table(models).to_csv(
+        args.data_dir / "best_dct_alpha_values.csv", index=False
+    )
     cosine_coefficients = coefficients[
         (coefficients["coefficient_index"] > 0) & coefficients["is_nonzero"]
     ].copy()
@@ -219,8 +244,6 @@ def main() -> None:
         model_formula(
             surface,
             group.rename(columns={"is_nonzero": "is_nonzero"}),
-            float(model.omega_grid.min()),
-            float(model.omega_grid.max()),
             args.zero_tolerance,
         )
         for surface, model in sorted(models.items())
