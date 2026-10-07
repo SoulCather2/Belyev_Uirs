@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import html
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -35,8 +36,8 @@ HTML_TEMPLATE = """<!doctype html>
 
 
 def format_number(value: float) -> str:
-    """Format a coefficient compactly while keeping enough precision."""
-    return f"{value:.10g}"
+    """Format formula numbers with exactly two decimal places."""
+    return f"{value:.2f}"
 
 
 def latex_surface_name(surface: str) -> str:
@@ -49,6 +50,36 @@ def signed_term(coefficient: float, expression: str) -> str:
     """Return a coefficient term with its leading plus or minus sign."""
     sign = "+" if coefficient >= 0 else "-"
     return f" {sign} {format_number(abs(coefficient))} {expression}"
+
+
+def compact_number(value: float) -> str:
+    """Use a simple exact fraction when it is short enough; otherwise use decimals."""
+    fraction = Fraction(value).limit_denominator(64)
+    if abs(float(fraction) - value) < 1e-10:
+        if fraction.denominator == 1:
+            return str(fraction.numerator)
+        return rf"\frac{{{fraction.numerator}}}{{{fraction.denominator}}}"
+    return format_number(value)
+
+
+def affine_argument(
+    index: int,
+    size: int,
+    alpha_min: float,
+    alpha_max: float,
+) -> str:
+    """Return the DCT argument as a compact affine expression in alpha."""
+    span = alpha_max - alpha_min
+    alpha_coefficient = index * (size - 1) / (size * span)
+    constant = index / size * (-(size - 1) * alpha_min / span + 0.5)
+    alpha_term = compact_number(alpha_coefficient)
+    if alpha_coefficient == 1:
+        alpha_term = r"\alpha"
+    else:
+        alpha_term += r"\alpha"
+    sign = "+" if constant >= 0 else "-"
+    constant_term = compact_number(abs(constant))
+    return rf"{alpha_term} {sign} {constant_term}"
 
 
 def model_formula(
@@ -70,14 +101,6 @@ def model_formula(
     if not nonzero.any():
         raise ValueError(f"All DCT coefficients are zero for {surface!r}")
 
-    scale = size - 1
-    alpha_offset = f"{format_number(alpha_min)}"
-    alpha_span = format_number(alpha_max - alpha_min)
-    argument = (
-        rf"\frac{{{scale}(\alpha - ({alpha_offset}))}}{{{alpha_span}}}"
-        r" + \frac{1}{2}"
-    )
-
     terms: list[str] = []
     for index, coefficient, present in zip(indices, values, nonzero):
         if not present:
@@ -85,7 +108,8 @@ def model_formula(
         if index == 0:
             terms.append(rf"\frac{{{format_number(coefficient)}}}{{2}}")
             continue
-        cosine = rf"\cos\left(\frac{{{index}\pi}}{{{size}}}\left({argument}\right)\right)"
+        argument = affine_argument(index, size, alpha_min, alpha_max)
+        cosine = rf"\cos\left(\pi\left({argument}\right)\right)"
         terms.append(signed_term(coefficient, cosine))
 
     body = "".join(terms)
