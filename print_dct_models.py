@@ -74,8 +74,9 @@ def model_formula(
         if index == 0:
             terms.append(rf"\frac{{{format_number(coefficient)}}}{{2}}")
             continue
+        numerator = r"\pi" if index == 1 else rf"{index}\pi"
         cosine = (
-                rf"\cos\left[\frac{{{index}\pi}}{{{size}}}"
+            rf"\cos\left[\frac{{{numerator}}}{{{size}}}"
             rf"\left(\alpha + \frac{{1}}{{2}}\right)\right]"
             )
         terms.append(signed_term(coefficient, cosine))
