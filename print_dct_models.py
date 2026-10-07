@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import html
-from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -47,39 +46,8 @@ def latex_surface_name(surface: str) -> str:
 
 
 def signed_term(coefficient: float, expression: str) -> str:
-    """Return a coefficient term with its leading plus or minus sign."""
-    sign = "+" if coefficient >= 0 else "-"
-    return f" {sign} {format_number(abs(coefficient))} {expression}"
-
-
-def compact_number(value: float) -> str:
-    """Use a simple exact fraction when it is short enough; otherwise use decimals."""
-    fraction = Fraction(value).limit_denominator(64)
-    if abs(float(fraction) - value) < 1e-10:
-        if fraction.denominator == 1:
-            return str(fraction.numerator)
-        return rf"\frac{{{fraction.numerator}}}{{{fraction.denominator}}}"
-    return format_number(value)
-
-
-def affine_argument(
-    index: int,
-    size: int,
-    alpha_min: float,
-    alpha_max: float,
-) -> str:
-    """Return the DCT argument as a compact affine expression in alpha."""
-    span = alpha_max - alpha_min
-    alpha_coefficient = index * (size - 1) / (size * span)
-    constant = index / size * (-(size - 1) * alpha_min / span + 0.5)
-    alpha_term = compact_number(alpha_coefficient)
-    if alpha_coefficient == 1:
-        alpha_term = r"\alpha"
-    else:
-        alpha_term += r"\alpha"
-    sign = "+" if constant >= 0 else "-"
-    constant_term = compact_number(abs(constant))
-    return rf"{alpha_term} {sign} {constant_term}"
+    """Return a coefficient term with its leading plus sign."""
+    return f" + {format_number(abs(coefficient))} {expression}"
 
 
 def model_formula(
@@ -108,8 +76,14 @@ def model_formula(
         if index == 0:
             terms.append(rf"\frac{{{format_number(coefficient)}}}{{2}}")
             continue
-        argument = affine_argument(index, size, alpha_min, alpha_max)
-        cosine = rf"\cos\left(\pi\left({argument}\right)\right)"
+        alpha_coordinate = (
+            rf"\frac{{{size - 1}\left(\alpha {'-' if alpha_min >= 0 else '+'} {format_number(abs(alpha_min))}\right)}}"
+            rf"{{{format_number(alpha_max - alpha_min)}}}"
+        )
+        cosine = (
+            rf"\cos\left[\frac{{\pi \cdot {index}}}{{{size}}}"
+            rf"\left({alpha_coordinate} + \frac{{1}}{{2}}\right)\right]"
+        )
         terms.append(signed_term(coefficient, cosine))
 
     body = "".join(terms)
