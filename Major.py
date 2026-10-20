@@ -1,15 +1,23 @@
+from itertools import combinations
 from pathlib import Path
 import pickle
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
+
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype, is_numeric_dtype
 from scipy.fft import dct
 from scipy.signal import savgol_filter
 from scipy.stats import norm
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
+_EPOCH = pd.Timestamp("1970-01-01")
 
 @dataclass(frozen=True)
 class PipelineConfig:
@@ -739,6 +747,124 @@ def generate_classification_report(
     return float(accuracy), report_text, report_df
 
 
+def plot_scatter_with_errors(
+    data: pd.DataFrame,
+    x: str,
+    y: str | Sequence[str],
+    wrong_cls: str,
+    *,
+    error_name: str | None = None,
+    error_color: str = "red",
+    error_opacity: float = 0.3,
+    **kwargs: Any,
+) -> go.Figure:
+    """Scatter plot (plotly.express.scatter) with shaded regions where the classifier is wrong.
+ 
+    Parameters
+    ----------
+    data : DataFrame with the already computed data. Correctness of the
+        classification must be computed beforehand; nothing is computed here.
+    x : name of the x column (numeric or datetime).
+    y : name or list of names of y columns (as in px.scatter).
+    wrong_cls : name of a boolean (or 0/1) column; True means "classifier is wrong".
+        NaN is treated as "no error".
+    error_name : legend label of the shading (defaults to ``wrong_cls``).
+    error_color, error_opacity : shading appearance.
+    **kwargs : passed as is to ``plotly.express.scatter``
+        (color, symbol, facet_col, template, title, labels, ...).
+ 
+    Returns
+    -------
+    plotly.graph_objects.Figure. The shading is one legend entry; clicking it
+    hides/shows all shaded regions (in all facets as well).
+ 
+    Notes
+    -----
+    A shaded region spans from the midpoint between a wrong point and its
+    correct left neighbour to the midpoint with its correct right neighbour,
+    so consecutive wrong points merge into one band. Requires plotly >= 5.15
+    (shapes in the legend).
+    """
+    # ---- validation (before any plotting) ----
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("data must be a pandas DataFrame")
+    for name in (x, wrong_cls):
+        if name not in data.columns:
+            raise ValueError(f"Column {name!r} is not in the dataset")
+    if "row" in kwargs or "col" in kwargs:
+        raise TypeError("Do not pass row/col; use facet_row/facet_col")
+ 
+    error_values = data[wrong_cls]
+    if not is_bool_dtype(error_values.dtype):
+        if not is_numeric_dtype(error_values.dtype) or not error_values.dropna().isin([0, 1]).all():
+            raise TypeError(f"{wrong_cls!r} must contain boolean or 0/1 values")
+    errors = error_values.fillna(False).astype(bool).to_numpy()
+ 
+    x_values = data[x]
+    if is_datetime64_any_dtype(x_values.dtype):
+        dt = pd.to_datetime(x_values)
+        if dt.dt.tz is not None:
+            dt = dt.dt.tz_localize(None)  # wall-clock time, as shown on the axis
+        coordinates = ((dt - _EPOCH) / pd.Timedelta(seconds=1)).to_numpy(dtype=float)
+        datetime_axis = True
+    elif is_numeric_dtype(x_values.dtype) and not is_bool_dtype(x_values.dtype):
+        coordinates = x_values.to_numpy(dtype=float, na_value=np.nan)
+        datetime_axis = False
+    else:
+        raise TypeError(f"{x!r} must be numeric or datetime to shade intervals")
+ 
+    figure = px.scatter(data_frame=data, x=x, y=y, **kwargs)
+ 
+    # ---- build shaded intervals ----
+    valid = np.isfinite(coordinates)
+    points = pd.DataFrame({"c": coordinates[valid], "err": errors[valid]})
+    if points.empty:
+        return figure
+    # One x can hold several series/rows: shade it if any of them is wrong.
+    points = points.groupby("c", sort=True, as_index=False)["err"].any()
+    c = points["c"].to_numpy()
+    err = points["err"].to_numpy()
+    if not err.any():
+        return figure
+ 
+    n = len(c)
+    if n == 1:
+        edges = np.array([c[0] - 0.5, c[0] + 0.5])
+    else:
+        mid = (c[:-1] + c[1:]) / 2
+        edges = np.concatenate(([c[0] - (c[1] - c[0]) / 2], mid, [c[-1] + (c[-1] - c[-2]) / 2]))
+ 
+    padded = np.concatenate(([False], err, [False])).astype(int)
+    diff = np.diff(padded)
+    starts = np.flatnonzero(diff == 1)
+    ends = np.flatnonzero(diff == -1)  # exclusive
+    intervals = [(edges[s], edges[e]) for s, e in zip(starts, ends)]
+ 
+    def axis_value(value: float) -> pd.Timestamp | float:
+        return _EPOCH + pd.to_timedelta(value, unit="s") if datetime_axis else float(value)
+ 
+    # ---- add shapes; single legend entry controlling all of them ----
+    label = error_name or wrong_cls
+    first = len(figure.layout.shapes)
+    for left, right in intervals:
+        figure.add_vrect(
+            x0=axis_value(left),
+            x1=axis_value(right),
+            fillcolor=error_color,
+            opacity=error_opacity,
+            line_width=0,
+            layer="below",
+            name=label,
+            legendgroup="classification_errors",
+            showlegend=False,
+            row="all",
+            col="all",
+        )
+    new_shapes = figure.layout.shapes[first:]
+    if new_shapes:
+        new_shapes[0].showlegend = True
+    return figure
+
 def plot_confusion_matrix(
     classification: pd.DataFrame, 
     output_dir: Path | None = None
@@ -779,6 +905,208 @@ def plot_confusion_matrix(
         figure.savefig(output_dir / "dct_confusion_matrix.png", dpi=150)
         
     return normalized_df, raw_df, figure
+def classify_samples_by_dct(
+    data: pd.DataFrame,
+    dct_models: dict,
+    dct_models_std: dict,
+    config,
+    reset_memory: bool = False,
+) -> pd.DataFrame:
+    """Classify every measurement; add ``wrong`` / ``raw_wrong`` columns.
+ 
+    reset_memory=False reproduces classify_experiments_by_dct (probability memory
+    is carried from one experiment to the next). reset_memory=True starts every
+    experiment from scratch, which is the honest per-run estimate.
+    Rows inside an experiment must already be in time order.
+    """
+    missing = {"terrain", "run_idx", "omega", "Ke"} - set(data.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
+    if data[["omega", "Ke"]].isna().any().any():
+        raise ValueError("omega and Ke must not contain NaN (it would poison the probability memory)")
+ 
+    classifier = Classifier(alpha=config.memory_margin)
+    for terrain, model in dct_models.items():
+        median_std = float(np.nanmedian(dct_models_std[terrain]))
+        classifier.add_surf(MedianModel(terrain, "Ke", model), MetricNormal(terrain, "Ke", median_std))
+ 
+    parts = []
+    for _, experiment in data.groupby(["terrain", "run_idx"], sort=True):
+        if reset_memory:
+            classifier.prev_results = None
+        names, raw_values, memory_values = classifier.classify_many(
+            experiment["omega"].to_numpy(dtype=float),
+            experiment["Ke"].to_numpy(dtype=float),
+        )
+        part = experiment.copy()
+        part["sample_idx"] = np.arange(len(part))
+        part["raw_predicted_terrain"] = np.asarray(names)[raw_values.argmax(axis=1)]
+        part["predicted_terrain"] = np.asarray(names)[memory_values.argmax(axis=1)]
+        for column, name in enumerate(names):
+            part[f"raw_probability_{name}"] = raw_values[:, column]
+            part[f"memory_probability_{name}"] = memory_values[:, column]
+        parts.append(part)
+ 
+    result = pd.concat(parts, ignore_index=True)
+    result["wrong"] = result["predicted_terrain"] != result["terrain"]
+    result["raw_wrong"] = result["raw_predicted_terrain"] != result["terrain"]
+    return result
+
+def add_error_features(
+    samples: pd.DataFrame, amplitude_window: int = 60, straight_band: float = 0.02
+) -> pd.DataFrame:
+    """Add features used to explain errors (all computed inside one run)."""
+    s = samples.copy()
+    s["abs_omega"] = s["omega"].abs()
+    s["direction"] = np.where(
+        s["omega"] > straight_band, "left", np.where(s["omega"] < -straight_band, "right", "straight")
+    )
+    if {"curL", "curR"} <= set(s.columns):
+        s["cur_mean"] = (s["curL"].abs() + s["curR"].abs()) / 2
+        s["cur_diff"] = (s["curL"] - s["curR"]).abs()
+    if "speed" in s.columns:
+        s["abs_speed"] = s["speed"].abs()
+    keys = ["terrain", "run_idx"]
+    roll = s.groupby(keys, sort=False)["omega"]
+    s["amplitude"] = (
+        roll.transform(lambda v: v.rolling(amplitude_window, center=True, min_periods=1).max())
+        - roll.transform(lambda v: v.rolling(amplitude_window, center=True, min_periods=1).min())
+    )
+    size = s.groupby(keys, sort=False)["omega"].transform("size")
+    s["run_pos"] = s["sample_idx"] / (size - 1).clip(lower=1)
+    return s
+ 
+ 
+def error_by_feature(s: pd.DataFrame, features: list[str], n_bins: int = 8, error_col: str = "wrong") -> pd.DataFrame:
+    """Error rate inside equal-count bins of every feature, overall and per true terrain."""
+    rows = []
+    groups = [("ALL", s)] + [(str(t), g) for t, g in s.groupby("terrain", sort=True)]
+    for terrain, g in groups:
+        for feature in features:
+            valid = g[np.isfinite(g[feature])]
+            if valid[feature].nunique() < 2:
+                continue
+            bins = pd.qcut(valid[feature], q=n_bins, duplicates="drop")
+            for interval, part in valid.groupby(bins, observed=True):
+                rows.append(
+                    {
+                        "terrain": terrain,
+                        "feature": feature,
+                        "bin_left": float(interval.left),
+                        "bin_right": float(interval.right),
+                        "n": len(part),
+                        "error_rate": float(part[error_col].mean()),
+                    }
+                )
+    return pd.DataFrame(rows)
+ 
+ 
+def model_separation(dct_models: dict, dct_models_std: dict, points: int = 200) -> pd.DataFrame:
+    """How far apart two surface models are, in units of their spread, at each omega."""
+    names = list(dct_models)
+    lo = max(m.range_min for m in dct_models.values())
+    hi = min(m.range_max for m in dct_models.values())
+    omegas = np.linspace(lo, hi, points)
+    predictions = {n: MedianModel(n, "Ke", dct_models[n]).predict_many(omegas) for n in names}
+    stds = {n: float(np.nanmedian(dct_models_std[n])) for n in names}
+    rows = []
+    for a, b in combinations(names, 2):
+        pooled = np.sqrt((stds[a] ** 2 + stds[b] ** 2) / 2)
+        separation = np.abs(predictions[a] - predictions[b]) / pooled
+        rows.extend({"pair": f"{a} vs {b}", "omega": w, "separation": v} for w, v in zip(omegas, separation))
+    return pd.DataFrame(rows)
+ 
+ 
+def pick_example_runs(by_run: pd.DataFrame, worst: int = 1, mixed: int = 2, mixed_target: float = 0.4) -> pd.DataFrame:
+    """Per terrain: the worst runs, plus runs with a mix of right and wrong (most informative)."""
+    picks = []
+    for terrain, runs in by_run.groupby("terrain", sort=True):
+        top = runs.sort_values("error_rate", ascending=False).head(worst)
+        rest = runs.drop(top.index)
+        mid = rest.assign(d=(rest["error_rate"] - mixed_target).abs()).sort_values("d").head(mixed)
+        picks.append(top.assign(kind="worst"))
+        picks.append(mid.drop(columns="d").assign(kind="mixed"))
+    return pd.concat(picks, ignore_index=True)
+ 
+ 
+def save_example_plots(s: pd.DataFrame, by_run: pd.DataFrame, out_dir: Path, y=None) -> list[Path]:
+    """Save html plots (one panel per signal, own y scale) with red error bands."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    x = "time" if "time" in s.columns else "sample_idx"
+    signals = [c for c in (y or ["omega", "Ke", "speed", "cur_mean"]) if c in s.columns]
+    saved = []
+    for _, row in pick_example_runs(by_run).iterrows():
+        part = s[(s["terrain"] == row["terrain"]) & (s["run_idx"] == row["run_idx"])]
+        long = part.melt(id_vars=[x, "wrong"], value_vars=signals, var_name="signal", value_name="value")
+        fig = plot_scatter_with_errors(
+            long, x=x, y="value", wrong_cls="wrong", facet_row="signal", color="signal",
+            error_name="Ошибка классификатора",
+            title=f"Поверхность: {row['terrain']}, прогон {row['run_idx']} "
+                  f"(ошибок {row['error_rate']:.0%}, {row['kind']})",
+        )
+        fig.update_yaxes(matches=None)
+        fig.update_traces(marker_size=4)
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+        path = out_dir / f"{row['kind']}_{row['terrain']}_run{row['run_idx']}.html"
+        fig.write_html(path)
+        saved.append(path)
+    return saved
+ 
+ 
+def run_error_analysis(cleaned, dct_models, dct_models_std, config, out_dir: Path,
+                       n_bins: int = 8, make_plots: bool = True) -> pd.DataFrame:
+    """Compute everything needed for the error analysis and save small CSV summaries."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+ 
+    carry = classify_samples_by_dct(cleaned, dct_models, dct_models_std, config, reset_memory=False)
+    reset = classify_samples_by_dct(cleaned, dct_models, dct_models_std, config, reset_memory=True)
+    s = add_error_features(reset)
+ 
+    # 1. Overall, and the effect of carrying memory between runs.
+    by_terrain = pd.DataFrame(
+        {
+            "n": s.groupby("terrain").size(),
+            "error_reset_memory": s.groupby("terrain")["wrong"].mean(),
+            "error_carry_memory": carry.groupby("terrain")["wrong"].mean(),
+            "error_no_memory": s.groupby("terrain")["raw_wrong"].mean(),
+        }
+    ).reset_index()
+    by_terrain.to_csv(out_dir / "1_error_by_terrain.csv", index=False)
+ 
+    # 2. Which surface is mistaken for which.
+    pd.crosstab(s["terrain"], s["predicted_terrain"]).to_csv(out_dir / "2_confusion_per_sample.csv")
+ 
+    # 3. Errors against features.
+    features = [c for c in ["abs_omega", "omega", "abs_speed", "cur_mean", "cur_diff", "Ke", "amplitude"] if c in s.columns]
+    error_by_feature(s, features, n_bins).to_csv(out_dir / "3_error_by_feature.csv", index=False)
+    s.groupby(["terrain", "direction"])["wrong"].agg(n="size", error_rate="mean").reset_index().to_csv(
+        out_dir / "4_error_by_direction.csv", index=False
+    )
+ 
+    # 5. Position inside the run (start effect).
+    s["run_pos_bin"] = pd.cut(s["run_pos"], [-0.001, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0])
+    s.groupby(["terrain", "run_pos_bin"], observed=True)["wrong"].agg(n="size", error_rate="mean").reset_index().assign(
+        run_pos_bin=lambda d: d["run_pos_bin"].astype(str)
+    ).to_csv(out_dir / "5_error_by_run_position.csv", index=False)
+ 
+    # 6. Per run (to pick example plots), and 7. how close the models are.
+    by_run = s.groupby(["terrain", "run_idx"]).agg(
+        n=("wrong", "size"), error_rate=("wrong", "mean"),
+        mean_abs_omega=("abs_omega", "mean"), mean_amplitude=("amplitude", "mean"),
+        mean_Ke=("Ke", "mean"), Ke_std=("Ke", "std"),
+        omega_std=("omega", "std"), omega_range=("omega", lambda v: v.max() - v.min()),
+    ).reset_index()
+    by_run.to_csv(out_dir / "6_error_by_run.csv", index=False)
+    model_separation(dct_models, dct_models_std).to_csv(out_dir / "7_model_separation.csv", index=False)
+ 
+    s.drop(columns="run_pos_bin").to_csv(out_dir / "samples_with_errors.csv.gz", index=False)
+    if make_plots:
+        for path in save_example_plots(s, by_run, out_dir / "example_plots"):
+            print("saved", path)
+    print(by_terrain.round(3).to_string(index=False))
+    print(f"\nSaved analysis tables to {out_dir}")
+    return s
 
 
 def main() -> None:
@@ -866,7 +1194,32 @@ def main() -> None:
     
     motion_splits = split_by_motion(cleaned, grid, omega_limit, output_dir=data_dir / "motion_splits")
     print(f"Generated {len(motion_splits)} motion splits, saved to {data_dir / 'motion_splits'}")
+    # в main(), после classification = classify_experiments_by_dct(...)
+    classification = classification.reset_index(drop=True)
+    classification["experiment"] = classification.index
+    classification["wrong"] = classification["terrain"] != classification["predicted_terrain"]
 
+    fig = plot_scatter_with_errors(
+        classification,
+        x="experiment",
+        y=[f"memory_probability_{t}" for t in dct_models],
+        wrong_cls="wrong",
+        error_name="Ошибка классификатора",
+    )
+    fig.write_html(data_dir / "classification_errors.html")
+    samples = classify_samples_by_dct(cleaned, dct_models, dct_models_std, config)
+
+    one = samples[(samples["terrain"] == "FLOORING") & (samples["run_idx"] == 0)]
+    fig = plot_scatter_with_errors(
+        one, x="time", y=["omega", "Ke"], wrong_cls="wrong",
+        error_name="Ошибка классификатора",
+    )
+    fig.write_html(data_dir / "flooring_run0_errors.html")
+
+    run_error_analysis(cleaned, dct_models, dct_models_std, config, out_dir=data_dir / "error_analysis")
+    print({t: float(np.nanmedian(s)) for t, s in dct_models_std.items()})
+    x = samples[(samples.terrain == "SNOW") & (samples.omega.abs() > 0.276)]
+    print(x.predicted_terrain.value_counts(normalize=True))
 
 if __name__ == "__main__":
     main()

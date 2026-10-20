@@ -26,6 +26,49 @@ The input dataset is expected at `data/borealtc/merged_interpolation.csv`. Repor
 | `analyze_best_dct_models.py` | Rebuilds the DCT models using the best Optuna trial, generates analytical formulas, exports cosine coefficients, and compares the selected DCT positions between surfaces. |
 | `print_dct_models.py` | Reads saved DCT coefficients and renders the analytical surface formulas as HTML with MathJax or prints the formula source to the console. |
 
+## Interactive scatter plots
+
+`Major.plot_scatter_with_errors` wraps `plotly.express.scatter` and shades
+precomputed classifier-error intervals in red. Pass ordinary Plotly Express
+options such as `template` through keyword arguments; `y` can be one column or
+a list of columns:
+
+```python
+from Major import plot_scatter_with_errors
+
+figure = plot_scatter_with_errors(
+    data,
+    x="time",
+    y=["robot_omega", "robot_vel"],
+    wrong_cls="wrong_cls",
+    template="plotly_white",
+)
+figure.show()
+```
+
+The error column must contain booleans or 0/1 values; missing values are
+treated as correct. The function does not calculate classification results.
+The x column must be numeric or datetime-like so error intervals can be
+located. All error bands share one legend item and can be toggled together.
+
+## Classifier error analysis
+
+`Major.py` also contains helpers that explain where and why the DCT classifier
+makes mistakes:
+
+| Function | Purpose |
+| --- | --- |
+| `classify_samples_by_dct` | Classifies every measurement of every experiment and adds predicted terrains, raw and memory probabilities, and the `wrong` / `raw_wrong` error flags. `reset_memory=True` resets the probability memory at the start of each run. |
+| `add_error_features` | Adds per-run features used to explain errors: `abs_omega`, turn `direction`, mean and differential motor current, `abs_speed`, rolling `omega` `amplitude`, and relative position inside the run (`run_pos`). |
+| `error_by_feature` | Error rate inside equal-count bins of each feature, overall and per true terrain. |
+| `model_separation` | Distance between every pair of surface models, in units of their pooled spread, along the common `omega` range. |
+| `pick_example_runs` | Selects the worst run and runs with a mix of correct and wrong predictions for every terrain. |
+| `save_example_plots` | Saves interactive HTML plots of the selected runs (one panel per signal) with classifier-error intervals shaded in red. |
+| `run_error_analysis` | Runs the whole analysis and writes the CSV summaries (`1_error_by_terrain.csv` … `7_model_separation.csv`, `samples_with_errors.csv.gz`) and example plots to `data/borealtc/error_analysis/`. |
+
+The example plots are committed in `data/borealtc/error_analysis/example_plots/`
+(`worst_<TERRAIN>_run<N>.html` and `mixed_<TERRAIN>_run<N>.html`).
+
 ## Formula and optimization commands
 
 Generate the analytical formulas for the best trial:
