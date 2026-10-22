@@ -1,32 +1,35 @@
+from itertools import combinations
 from pathlib import Path
 import pickle
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
+
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.fft import dct
 from scipy.signal import savgol_filter
-from scipy.interpolate import interp1d
+from scipy.stats import norm
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.model_selection import GroupKFold
+
+from plot_errors import plot_scatter_with_errors
 
 
 @dataclass(frozen=True)
 class PipelineConfig:
-    window_size: int = 10
+    window_size: int = 30
     track_width: float = 0.6
     wheel_radius: float = 0.13
     motor_resistance: float = 0.46
     motor_back_emf: float = 0.141 / np.pi
     no_load_current: float = 1.35
-    n_bins: int = 51
-    n_dct_coefficients: int = 10
+    n_bins: int = 71
+    n_dct_coefficients: int = 28
     model_smoothing_window: int = 9
     model_smoothing_polyorder: int = 2
     std_score_weight: float = 0.5
     std_floor: float = 0.25
-    memory_margin: float = 0.05
+    memory_margin: float = 0.32952224820710885
     omega_limit: float = 0.5
     terrain_omega_limits: dict[str, float] = field(default_factory=dict)
     motion_columns: tuple[str, ...] = ("wx", "wy", "wz", "ax", "ay", "az", "velL", "velR", "curL", "curR")
@@ -141,6 +144,110 @@ class DCTModel:
         return result / len(self.coefficients)
 
 
+class MedianModel:
+    """Adapter exposing a DCT model through the classifier interface."""
+
+    def __init__(self, name: str, feature_name: str, model: DCTModel) -> None:
+        self.name = name
+        self.feature_name = feature_name
+        self.model = model
+
+    def predict(self, direction: float) -> float:
+        # DCT-модель возвращает ожидаемое значение Ke для данного направления.
+        return float(self.model.numpy_func(direction, scaled=True))
+
+    def predict_many(self, directions: np.ndarray) -> np.ndarray:
+        return self.model.numpy_func(directions, scaled=True)
+
+
+class MetricNormal:
+    """Convert model deviation to a normal-distribution likelihood."""
+
+    def __init__(self, name: str, feature_name: str, std: float) -> None:
+        self.name = name
+        self.feature_name = feature_name
+        self.std = max(float(std), 1e-6)
+
+    def calc_metric(self, value: float) -> float:
+        # Чем меньше отклонение от модели, тем выше правдоподобие поверхности.
+        return float(norm(0, self.std).pdf(value) + 1e-3)
+
+
+class Classifier:
+    """Classify sequential measurements using likelihood and probability memory."""
+
+    def __init__(self, alpha: float = 0.5) -> None:
+        self.models: dict[str, MedianModel] = {}
+        self.metrics: dict[str, MetricNormal] = {}
+        self.alpha = alpha
+        self.prev_results: np.ndarray | None = None
+
+    def add_surf(self, model: MedianModel, metric: MetricNormal) -> None:
+        if model.name != metric.name or model.feature_name != metric.feature_name:
+            raise ValueError("Model and metric must describe the same surface and feature")
+        self.models[model.name] = model
+        self.metrics[model.name] = metric
+
+    def classify(self, direction: float, feature: float) -> dict[str, float]:
+        return {
+            surface: self.metrics[surface].calc_metric(
+                feature - model.predict(direction)
+            )
+            for surface, model in self.models.items()
+        }
+
+    def classify_many(
+        self, directions: np.ndarray, features: np.ndarray
+    ) -> tuple[list[str], np.ndarray, np.ndarray]:
+        """Classify a whole experiment with vectorized likelihood calculations."""
+        names = list(self.models)
+        predictions = np.column_stack(
+            [self.models[name].predict_many(directions) for name in names]
+        )
+        standard_deviations = np.array(
+            [self.metrics[name].std for name in names], dtype=float
+        )
+        deviations = features[:, None] - predictions
+        likelihoods = np.exp(
+            -0.5 * (deviations / standard_deviations) ** 2
+        ) / (standard_deviations * np.sqrt(2 * np.pi)) + 1e-3
+        raw_values = likelihoods / likelihoods.sum(axis=1, keepdims=True)
+
+        # Последовательная память остается поэлементной, но дорогие расчеты выше векторизованы.
+        memory_values = np.empty_like(raw_values)
+        previous = self.prev_results
+        for index, raw_value in enumerate(raw_values):
+            if previous is None:
+                memory_value = raw_value
+            else:
+                memory_value = self.alpha * previous + (1 - self.alpha) * raw_value
+                memory_value = memory_value / memory_value.sum()
+            memory_values[index] = memory_value
+            previous = memory_value
+        self.prev_results = previous
+        return names, raw_values, memory_values
+
+    def classify_type_and_prob(
+        self, direction: float, feature: float
+    ) -> tuple[str, np.ndarray, str, np.ndarray]:
+        names = list(self.models)
+        # Нормируем likelihood каждой поверхности в набор вероятностей.
+        raw_values = np.array(
+            list(self.classify(direction, feature).values()), dtype=float
+        )
+        raw_values /= raw_values.sum()
+        raw_name = names[int(np.argmax(raw_values))]
+
+        memory_values = raw_values
+        if self.prev_results is not None:
+            # alpha удерживает предыдущий прогноз и сглаживает резкие переключения.
+            memory_values = self.alpha * self.prev_results + (1 - self.alpha) * raw_values
+            memory_values /= memory_values.sum()
+        self.prev_results = memory_values
+        memory_name = names[int(np.argmax(memory_values))]
+        return raw_name, raw_values, memory_name, memory_values
+
+
 def calculate_features(data: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
     """Calculate motion and energy features for every measurement."""
     missing_columns = set(config.motion_columns + config.group_columns) - set(data.columns)
@@ -162,8 +269,8 @@ def calculate_features(data: pd.DataFrame, config: PipelineConfig) -> pd.DataFra
 
 
 def filter_by_experiment(data: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
-    """Apply a centered mean filter without crossing experiment boundaries."""
-    filter_columns = [*config.motion_columns, *config.derived_columns]
+    """Filter raw motion measurements without crossing experiment boundaries."""
+    filter_columns = list(config.motion_columns)
     filtered = data.copy()
     filtered[filter_columns] = (
         data.groupby(list(config.group_columns), sort=False, group_keys=False)[filter_columns]
@@ -546,156 +653,56 @@ def classify_experiments_by_dct(
     config: PipelineConfig,
     initial_prediction: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Classify experiments with std-normalized distances and class memory.
-    Evaluated POINT-BY-POINT on original averaged data (NO binning).
-    """
+    """Classify sequential measurements with likelihood-based probability memory."""
+    # Классификатор получает DCT-модели и их разброс по каждой поверхности.
+    classifier = Classifier(alpha=config.memory_margin)
+    for terrain, model in dct_models.items():
+        median_std = float(np.nanmedian(dct_models_std[terrain]))
+        median_model = MedianModel(terrain, "Ke", model)
+        metric = MetricNormal(terrain, "Ke", median_std)
+        classifier.add_surf(median_model, metric)
+
     rows = []
     previous_prediction = initial_prediction
-    
+
     for (true_terrain, run_idx), experiment in data.groupby(["terrain", "run_idx"], sort=True):
-        rmse_scores = {}
-        std_scores = {}
-        
-        omega_vals = experiment["omega"].to_numpy(dtype=float)
-        ke_vals = experiment["Ke"].to_numpy(dtype=float)
-        
-        for terrain, model in dct_models.items():
-            model_grid = model.omega_grid
-            model_limit = max(abs(model_grid.min()), abs(model_grid.max()))
-            
-            mask = (omega_vals >= -model_limit) & (omega_vals <= model_limit)
-            if not np.any(mask):
-                continue
-                
-            omega_valid = omega_vals[mask]
-            ke_valid = ke_vals[mask]
-            
-            curve_valid = model.numpy_func(omega_valid, scaled=True)
-            
-            median_std = float(np.nanmedian(dct_models_std[terrain]))
-            fill_val = median_std if not np.isnan(median_std) else config.std_floor
-            std_interp = interp1d(model_grid, dct_models_std[terrain], bounds_error=False, fill_value=fill_val)
-            std_valid = np.maximum(std_interp(omega_valid), config.std_floor)
-            
-            rmse_scores[terrain] = float(np.sqrt(np.mean((ke_valid - curve_valid) ** 2)))
-            std_scores[terrain] = float(np.sqrt(np.mean(((ke_valid - curve_valid) / std_valid) ** 2)))
-        
-        if not rmse_scores:
+        raw_prediction = None
+        memory_prediction = None
+        raw_values = None
+        memory_values = None
+        directions = experiment["omega"].to_numpy(dtype=float)
+        features = experiment["Ke"].to_numpy(dtype=float)
+        names, raw_probabilities, memory_probabilities = classifier.classify_many(
+            directions, features
+        )
+        raw_values = raw_probabilities[-1]
+        memory_values = memory_probabilities[-1]
+        raw_prediction = names[int(np.argmax(raw_values))]
+        memory_prediction = names[int(np.argmax(memory_values))]
+
+        if memory_prediction is None or raw_values is None or memory_values is None:
             continue
-            
-        rmse_scale = max(float(np.median(list(rmse_scores.values()))), 1e-6)
-        std_scale = max(float(np.median(list(std_scores.values()))), 1e-6)
-        
-        scores = {
-            terrain: rmse_scores[terrain] / rmse_scale
-            + config.std_score_weight * std_scores[terrain] / std_scale
-            for terrain in rmse_scores
-        }
-        
-        prediction = min(scores, key=scores.get)
-        
-        # Hysteresis: keep the previous prediction when the new one is only slightly better.
-        if previous_prediction in scores and prediction != previous_prediction:
-            if scores[previous_prediction] <= scores[prediction] * (1 + config.memory_margin):
-                prediction = previous_prediction
 
         rows.append(
             {
                 "terrain": true_terrain,
                 "run_idx": run_idx,
-                "predicted_terrain": prediction,
+                "predicted_terrain": memory_prediction,
+                "raw_predicted_terrain": raw_prediction,
                 "previous_prediction": previous_prediction,
-                **{f"rmse_{terrain}": score for terrain, score in rmse_scores.items()},
-                **{f"std_score_{terrain}": score for terrain, score in std_scores.items()},
+                **{
+                    f"raw_probability_{terrain}": value
+                    for terrain, value in zip(classifier.models, raw_values)
+                },
+                **{
+                    f"memory_probability_{terrain}": value
+                    for terrain, value in zip(classifier.models, memory_values)
+                },
             }
         )
-        previous_prediction = prediction
+        previous_prediction = memory_prediction
 
     return pd.DataFrame(rows)
-
-
-def classify_experiments_leave_one_out(
-    data: pd.DataFrame,
-    config: PipelineConfig,
-    grid: np.ndarray,
-    omega_limit: float,
-) -> pd.DataFrame:
-    """Evaluate each original experiment against models trained without it."""
-    rows = []
-    ordered_groups = data[list(config.group_columns)].drop_duplicates().sort_values("run_idx")
-    previous_prediction = None
-    
-    for group in ordered_groups.itertuples(index=False):
-        group_mask = (data["terrain"] == group.terrain) & (data["run_idx"] == group.run_idx)
-        training_data = data.loc[~group_mask]
-        
-        _, _, models, models_std = calculate_dct_coefficients(training_data, config, grid, omega_limit)
-        
-        prediction = classify_experiments_by_dct(
-            data.loc[group_mask], models, models_std, config,
-            initial_prediction=previous_prediction
-        )
-        if prediction.empty:
-            continue
-            
-        prediction.loc[:, "previous_prediction"] = previous_prediction
-        rows.append(prediction.iloc[0])
-        previous_prediction = prediction.iloc[0]["predicted_terrain"]
-        
-    return pd.DataFrame(rows)
-
-
-def select_dct_coefficients(
-    data: pd.DataFrame,
-    candidates: list[int],
-    config: PipelineConfig,
-    grid: np.ndarray,
-    omega_limit: float,
-    n_splits: int = 5,
-) -> tuple[int, pd.DataFrame]:
-    """Select the DCT cutoff using grouped cross-validation by experiment."""
-    groups = data["terrain"].astype(str) + "::" + data["run_idx"].astype(str)
-    n_splits = min(n_splits, groups.nunique())
-    if n_splits < 2:
-        raise ValueError("At least two experiments are required for cross-validation")
-
-    folds = list(GroupKFold(n_splits=n_splits).split(data, groups=groups))
-    rows = []
-    for cutoff in candidates:
-        candidate_config = replace(config, n_dct_coefficients=cutoff)
-        fold_scores = []
-        for train_indices, test_indices in folds:
-            train_data = data.iloc[train_indices]
-            test_data = data.iloc[test_indices]
-            _, _, models, models_std = calculate_dct_coefficients(
-                train_data, candidate_config, grid, omega_limit
-            )
-            predictions = classify_experiments_by_dct(
-                test_data, models, models_std, candidate_config
-            )
-            if predictions.empty:
-                continue
-            report = classification_report(
-                predictions["terrain"], predictions["predicted_terrain"],
-                output_dict=True, zero_division=0,
-            )
-            fold_scores.append(
-                {
-                    "accuracy": accuracy_score(predictions["terrain"], predictions["predicted_terrain"]),
-                    "macro_f1": report["macro avg"]["f1-score"],
-                }
-            )
-        average = pd.DataFrame(fold_scores).mean()
-        rows.append(
-            {
-                "n_coefficients": cutoff,
-                "cv_accuracy": average["accuracy"],
-                "cv_macro_f1": average["macro_f1"],
-            }
-        )
-    results = pd.DataFrame(rows).sort_values(["cv_macro_f1", "cv_accuracy"], ascending=False)
-    return int(results.iloc[0]["n_coefficients"]), results
 
 
 def generate_classification_report(
@@ -718,8 +725,17 @@ def generate_classification_report(
     
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
+        report_intro = (
+            "Project stage summary\n"
+            "=====================\n"
+            "Earlier stages prepared filtered motion data, DCT surface models, "
+            "and Optuna hyperparameter search.\n"
+            "This stage evaluates the likelihood-based surface classifier with "
+            "probability memory on the filtered experiments.\n\n"
+        )
         (output_dir / "classification_report.txt").write_text(
-            f"Accuracy: {accuracy:.6f}\n\n{report_text}", encoding="utf-8"
+            report_intro + f"Accuracy: {accuracy:.6f}\n\n{report_text}",
+            encoding="utf-8",
         )
         report_df.to_csv(output_dir / "classification_report.csv")
         (output_dir / "classification_accuracy.txt").write_text(f"{accuracy:.6f}\n", encoding="utf-8")
@@ -767,6 +783,208 @@ def plot_confusion_matrix(
         figure.savefig(output_dir / "dct_confusion_matrix.png", dpi=150)
         
     return normalized_df, raw_df, figure
+def classify_samples_by_dct(
+    data: pd.DataFrame,
+    dct_models: dict,
+    dct_models_std: dict,
+    config,
+    reset_memory: bool = False,
+) -> pd.DataFrame:
+    """Classify every measurement; add ``wrong`` / ``raw_wrong`` columns.
+ 
+    reset_memory=False reproduces classify_experiments_by_dct (probability memory
+    is carried from one experiment to the next). reset_memory=True starts every
+    experiment from scratch, which is the honest per-run estimate.
+    Rows inside an experiment must already be in time order.
+    """
+    missing = {"terrain", "run_idx", "omega", "Ke"} - set(data.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
+    if data[["omega", "Ke"]].isna().any().any():
+        raise ValueError("omega and Ke must not contain NaN (it would poison the probability memory)")
+ 
+    classifier = Classifier(alpha=config.memory_margin)
+    for terrain, model in dct_models.items():
+        median_std = float(np.nanmedian(dct_models_std[terrain]))
+        classifier.add_surf(MedianModel(terrain, "Ke", model), MetricNormal(terrain, "Ke", median_std))
+ 
+    parts = []
+    for _, experiment in data.groupby(["terrain", "run_idx"], sort=True):
+        if reset_memory:
+            classifier.prev_results = None
+        names, raw_values, memory_values = classifier.classify_many(
+            experiment["omega"].to_numpy(dtype=float),
+            experiment["Ke"].to_numpy(dtype=float),
+        )
+        part = experiment.copy()
+        part["sample_idx"] = np.arange(len(part))
+        part["raw_predicted_terrain"] = np.asarray(names)[raw_values.argmax(axis=1)]
+        part["predicted_terrain"] = np.asarray(names)[memory_values.argmax(axis=1)]
+        for column, name in enumerate(names):
+            part[f"raw_probability_{name}"] = raw_values[:, column]
+            part[f"memory_probability_{name}"] = memory_values[:, column]
+        parts.append(part)
+ 
+    result = pd.concat(parts, ignore_index=True)
+    result["wrong"] = result["predicted_terrain"] != result["terrain"]
+    result["raw_wrong"] = result["raw_predicted_terrain"] != result["terrain"]
+    return result
+
+def add_error_features(
+    samples: pd.DataFrame, amplitude_window: int = 60, straight_band: float = 0.02
+) -> pd.DataFrame:
+    """Add features used to explain errors (all computed inside one run)."""
+    s = samples.copy()
+    s["abs_omega"] = s["omega"].abs()
+    s["direction"] = np.where(
+        s["omega"] > straight_band, "left", np.where(s["omega"] < -straight_band, "right", "straight")
+    )
+    if {"curL", "curR"} <= set(s.columns):
+        s["cur_mean"] = (s["curL"].abs() + s["curR"].abs()) / 2
+        s["cur_diff"] = (s["curL"] - s["curR"]).abs()
+    if "speed" in s.columns:
+        s["abs_speed"] = s["speed"].abs()
+    keys = ["terrain", "run_idx"]
+    roll = s.groupby(keys, sort=False)["omega"]
+    s["amplitude"] = (
+        roll.transform(lambda v: v.rolling(amplitude_window, center=True, min_periods=1).max())
+        - roll.transform(lambda v: v.rolling(amplitude_window, center=True, min_periods=1).min())
+    )
+    size = s.groupby(keys, sort=False)["omega"].transform("size")
+    s["run_pos"] = s["sample_idx"] / (size - 1).clip(lower=1)
+    return s
+ 
+ 
+def error_by_feature(s: pd.DataFrame, features: list[str], n_bins: int = 8, error_col: str = "wrong") -> pd.DataFrame:
+    """Error rate inside equal-count bins of every feature, overall and per true terrain."""
+    rows = []
+    groups = [("ALL", s)] + [(str(t), g) for t, g in s.groupby("terrain", sort=True)]
+    for terrain, g in groups:
+        for feature in features:
+            valid = g[np.isfinite(g[feature])]
+            if valid[feature].nunique() < 2:
+                continue
+            bins = pd.qcut(valid[feature], q=n_bins, duplicates="drop")
+            for interval, part in valid.groupby(bins, observed=True):
+                rows.append(
+                    {
+                        "terrain": terrain,
+                        "feature": feature,
+                        "bin_left": float(interval.left),
+                        "bin_right": float(interval.right),
+                        "n": len(part),
+                        "error_rate": float(part[error_col].mean()),
+                    }
+                )
+    return pd.DataFrame(rows)
+ 
+ 
+def model_separation(dct_models: dict, dct_models_std: dict, points: int = 200) -> pd.DataFrame:
+    """How far apart two surface models are, in units of their spread, at each omega."""
+    names = list(dct_models)
+    lo = max(m.range_min for m in dct_models.values())
+    hi = min(m.range_max for m in dct_models.values())
+    omegas = np.linspace(lo, hi, points)
+    predictions = {n: MedianModel(n, "Ke", dct_models[n]).predict_many(omegas) for n in names}
+    stds = {n: float(np.nanmedian(dct_models_std[n])) for n in names}
+    rows = []
+    for a, b in combinations(names, 2):
+        pooled = np.sqrt((stds[a] ** 2 + stds[b] ** 2) / 2)
+        separation = np.abs(predictions[a] - predictions[b]) / pooled
+        rows.extend({"pair": f"{a} vs {b}", "omega": w, "separation": v} for w, v in zip(omegas, separation))
+    return pd.DataFrame(rows)
+ 
+ 
+def pick_example_runs(by_run: pd.DataFrame, worst: int = 1, mixed: int = 2, mixed_target: float = 0.4) -> pd.DataFrame:
+    """Per terrain: the worst runs, plus runs with a mix of right and wrong (most informative)."""
+    picks = []
+    for terrain, runs in by_run.groupby("terrain", sort=True):
+        top = runs.sort_values("error_rate", ascending=False).head(worst)
+        rest = runs.drop(top.index)
+        mid = rest.assign(d=(rest["error_rate"] - mixed_target).abs()).sort_values("d").head(mixed)
+        picks.append(top.assign(kind="worst"))
+        picks.append(mid.drop(columns="d").assign(kind="mixed"))
+    return pd.concat(picks, ignore_index=True)
+ 
+ 
+def save_example_plots(s: pd.DataFrame, by_run: pd.DataFrame, out_dir: Path, y=None) -> list[Path]:
+    """Save html plots (one panel per signal, own y scale) with red error bands."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    x = "time" if "time" in s.columns else "sample_idx"
+    signals = [c for c in (y or ["omega", "Ke", "speed", "cur_mean"]) if c in s.columns]
+    saved = []
+    for _, row in pick_example_runs(by_run).iterrows():
+        part = s[(s["terrain"] == row["terrain"]) & (s["run_idx"] == row["run_idx"])]
+        long = part.melt(id_vars=[x, "wrong"], value_vars=signals, var_name="signal", value_name="value")
+        fig = plot_scatter_with_errors(
+            long, x=x, y="value", wrong_cls="wrong", facet_row="signal", color="signal",
+            error_name="Ошибка классификатора",
+            title=f"Поверхность: {row['terrain']}, прогон {row['run_idx']} "
+                  f"(ошибок {row['error_rate']:.0%}, {row['kind']})",
+        )
+        fig.update_yaxes(matches=None)
+        fig.update_traces(marker_size=4)
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+        path = out_dir / f"{row['kind']}_{row['terrain']}_run{row['run_idx']}.html"
+        fig.write_html(path)
+        saved.append(path)
+    return saved
+ 
+ 
+def run_error_analysis(cleaned, dct_models, dct_models_std, config, out_dir: Path,
+                       n_bins: int = 8, make_plots: bool = True) -> pd.DataFrame:
+    """Compute everything needed for the error analysis and save small CSV summaries."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+ 
+    carry = classify_samples_by_dct(cleaned, dct_models, dct_models_std, config, reset_memory=False)
+    reset = classify_samples_by_dct(cleaned, dct_models, dct_models_std, config, reset_memory=True)
+    s = add_error_features(reset)
+ 
+    # 1. Overall, and the effect of carrying memory between runs.
+    by_terrain = pd.DataFrame(
+        {
+            "n": s.groupby("terrain").size(),
+            "error_reset_memory": s.groupby("terrain")["wrong"].mean(),
+            "error_carry_memory": carry.groupby("terrain")["wrong"].mean(),
+            "error_no_memory": s.groupby("terrain")["raw_wrong"].mean(),
+        }
+    ).reset_index()
+    by_terrain.to_csv(out_dir / "1_error_by_terrain.csv", index=False)
+ 
+    # 2. Which surface is mistaken for which.
+    pd.crosstab(s["terrain"], s["predicted_terrain"]).to_csv(out_dir / "2_confusion_per_sample.csv")
+ 
+    # 3. Errors against features.
+    features = [c for c in ["abs_omega", "omega", "abs_speed", "cur_mean", "cur_diff", "Ke", "amplitude"] if c in s.columns]
+    error_by_feature(s, features, n_bins).to_csv(out_dir / "3_error_by_feature.csv", index=False)
+    s.groupby(["terrain", "direction"])["wrong"].agg(n="size", error_rate="mean").reset_index().to_csv(
+        out_dir / "4_error_by_direction.csv", index=False
+    )
+ 
+    # 5. Position inside the run (start effect).
+    s["run_pos_bin"] = pd.cut(s["run_pos"], [-0.001, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0])
+    s.groupby(["terrain", "run_pos_bin"], observed=True)["wrong"].agg(n="size", error_rate="mean").reset_index().assign(
+        run_pos_bin=lambda d: d["run_pos_bin"].astype(str)
+    ).to_csv(out_dir / "5_error_by_run_position.csv", index=False)
+ 
+    # 6. Per run (to pick example plots), and 7. how close the models are.
+    by_run = s.groupby(["terrain", "run_idx"]).agg(
+        n=("wrong", "size"), error_rate=("wrong", "mean"),
+        mean_abs_omega=("abs_omega", "mean"), mean_amplitude=("amplitude", "mean"),
+        mean_Ke=("Ke", "mean"), Ke_std=("Ke", "std"),
+        omega_std=("omega", "std"), omega_range=("omega", lambda v: v.max() - v.min()),
+    ).reset_index()
+    by_run.to_csv(out_dir / "6_error_by_run.csv", index=False)
+    model_separation(dct_models, dct_models_std).to_csv(out_dir / "7_model_separation.csv", index=False)
+ 
+    s.drop(columns="run_pos_bin").to_csv(out_dir / "samples_with_errors.csv.gz", index=False)
+    if make_plots:
+        for path in save_example_plots(s, by_run, out_dir / "example_plots"):
+            print("saved", path)
+    print(by_terrain.round(3).to_string(index=False))
+    print(f"\nSaved analysis tables to {out_dir}")
+    return s
 
 
 def main() -> None:
@@ -785,20 +1003,24 @@ def main() -> None:
     # 2. Configure the processing pipeline.
     config = PipelineConfig()
     
-    # 3. Calculate features and the shared angular-velocity grid.
-    features = calculate_features(data, config)
+    # 3. Filter raw measurements, then calculate Ke from the filtered signals.
+    filtered_motion = filter_by_experiment(data, config)
+    features = calculate_features(filtered_motion, config)
     grid, omega_limit = build_symmetric_grid(features, config)
     
-    # 4. Filter measurements and remove outliers.
-    filtered = filter_by_experiment(features, config)
-    cleaned = remove_ke_outliers(filtered, config)
+    # 4. Remove outliers from the window-specific features.
+    cleaned = remove_ke_outliers(features, config)
     cleaned.to_csv(output_path, index=False)
     print(f"Saved filtered dataframe to {output_path}")
+
+    # Обучение идет на разбитых motion-данных, а проверка ниже - на cleaned.
+    split_data = split_by_motion(cleaned, grid, omega_limit)
+    training_data = pd.concat(split_data.values(), ignore_index=True)
     
-    # 5. Calculate final DCT models and standard deviations.
+    # 5. Calculate final DCT models and standard deviations from split data.
     print(f"Using {config.n_dct_coefficients} DCT coefficients")
     median_ke, coefficients, dct_models, dct_models_std = calculate_dct_coefficients(
-        cleaned, config, grid, omega_limit
+        training_data, config, grid, omega_limit
     )
     
     # 7. Define output paths.
@@ -833,8 +1055,10 @@ def main() -> None:
     )
     plot_terrain_ranges(features, output_path=terrain_ranges_path)
     
-    # 10. Run leave-one-experiment-out classification.
-    classification = classify_experiments_leave_one_out(cleaned, config, grid, omega_limit)
+    # 10. Classify real cleaned experiments with models trained on split data.
+    classification = classify_experiments_by_dct(
+        cleaned, dct_models, dct_models_std, config
+    )
     classification.to_csv(classification_path, index=False)
     
     # 11. Calculate metrics and reports.
@@ -848,7 +1072,32 @@ def main() -> None:
     
     motion_splits = split_by_motion(cleaned, grid, omega_limit, output_dir=data_dir / "motion_splits")
     print(f"Generated {len(motion_splits)} motion splits, saved to {data_dir / 'motion_splits'}")
+    # в main(), после classification = classify_experiments_by_dct(...)
+    classification = classification.reset_index(drop=True)
+    classification["experiment"] = classification.index
+    classification["wrong"] = classification["terrain"] != classification["predicted_terrain"]
 
+    fig = plot_scatter_with_errors(
+        classification,
+        x="experiment",
+        y=[f"memory_probability_{t}" for t in dct_models],
+        wrong_cls="wrong",
+        error_name="Ошибка классификатора",
+    )
+    fig.write_html(data_dir / "classification_errors.html")
+    samples = classify_samples_by_dct(cleaned, dct_models, dct_models_std, config)
+
+    one = samples[(samples["terrain"] == "FLOORING") & (samples["run_idx"] == 0)]
+    fig = plot_scatter_with_errors(
+        one, x="time", y=["omega", "Ke"], wrong_cls="wrong",
+        error_name="Ошибка классификатора",
+    )
+    fig.write_html(data_dir / "flooring_run0_errors.html")
+
+    run_error_analysis(cleaned, dct_models, dct_models_std, config, out_dir=data_dir / "error_analysis")
+    print({t: float(np.nanmedian(s)) for t, s in dct_models_std.items()})
+    x = samples[(samples.terrain == "SNOW") & (samples.omega.abs() > 0.276)]
+    print(x.predicted_terrain.value_counts(normalize=True))
 
 if __name__ == "__main__":
     main()
