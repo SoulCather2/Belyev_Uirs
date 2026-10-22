@@ -25,16 +25,17 @@ The input dataset is expected at `data/borealtc/merged_interpolation.csv`. Repor
 | `optimize_hyperparameters.py` | Runs Optuna hyperparameter optimization. For every trial it filters the raw signals, recalculates `Ke`, trains the DCT models, evaluates the classifier, and saves the best parameters and trial history. |
 | `analyze_best_dct_models.py` | Rebuilds the DCT models using the best Optuna trial, generates analytical formulas, exports cosine coefficients, and compares the selected DCT positions between surfaces. |
 | `print_dct_models.py` | Reads saved DCT coefficients and renders the analytical surface formulas as HTML with MathJax or prints the formula source to the console. |
+| `plot_errors.py` | Standalone plotting module (numpy, pandas, plotly only): `plot_scatter_with_errors` shades classifier-error intervals; `plot_run` plots one run of a dataset with predictions, one panel per signal. |
 
 ## Interactive scatter plots
 
-`Major.plot_scatter_with_errors` wraps `plotly.express.scatter` and shades
+`plot_errors.plot_scatter_with_errors` wraps `plotly.express.scatter` and shades
 precomputed classifier-error intervals in red. Pass ordinary Plotly Express
 options such as `template` through keyword arguments; `y` can be one column or
 a list of columns:
 
 ```python
-from Major import plot_scatter_with_errors
+from plot_errors import plot_scatter_with_errors
 
 figure = plot_scatter_with_errors(
     data,
