@@ -1,14 +1,3 @@
-"""Scatter plots with classifier-error intervals shaded in red.
-
-The module depends only on numpy, pandas and plotly, so it can be used on its
-own with the dataset produced by ``export_predictions.py``:
-
-    import pandas as pd
-    from plot_errors import plot_run
-
-    data = pd.read_csv("data/borealtc/dataset_with_predictions.csv.gz")
-    plot_run(data, "SNOW", 2).show()
-"""
 from collections.abc import Sequence
 from typing import Any
 
@@ -32,34 +21,6 @@ def plot_scatter_with_errors(
     error_opacity: float = 0.3,
     **kwargs: Any,
 ) -> go.Figure:
-    """Scatter plot (plotly.express.scatter) with shaded regions where the classifier is wrong.
-
-    Parameters
-    ----------
-    data : DataFrame with the already computed data. Correctness of the
-        classification must be computed beforehand; nothing is computed here.
-    x : name of the x column (numeric or datetime).
-    y : name or list of names of y columns (as in px.scatter).
-    wrong_cls : name of a boolean (or 0/1) column; True means "classifier is wrong".
-        NaN is treated as "no error".
-    error_name : legend label of the shading (defaults to ``wrong_cls``).
-    error_color, error_opacity : shading appearance.
-    **kwargs : passed as is to ``plotly.express.scatter``
-        (color, symbol, facet_col, template, title, labels, ...).
-
-    Returns
-    -------
-    plotly.graph_objects.Figure. The shading is one legend entry; clicking it
-    hides/shows all shaded regions (in all facets as well).
-
-    Notes
-    -----
-    A shaded region spans from the midpoint between a wrong point and its
-    correct left neighbour to the midpoint with its correct right neighbour,
-    so consecutive wrong points merge into one band. Requires plotly >= 5.15
-    (shapes in the legend).
-    """
-    # ---- validation (before any plotting) ----
     if not isinstance(data, pd.DataFrame):
         raise TypeError("data must be a pandas DataFrame")
     for name in (x, wrong_cls):
@@ -78,7 +39,7 @@ def plot_scatter_with_errors(
     if is_datetime64_any_dtype(x_values.dtype):
         dt = pd.to_datetime(x_values)
         if dt.dt.tz is not None:
-            dt = dt.dt.tz_localize(None)  # wall-clock time, as shown on the axis
+            dt = dt.dt.tz_localize(None)
         coordinates = ((dt - _EPOCH) / pd.Timedelta(seconds=1)).to_numpy(dtype=float)
         datetime_axis = True
     elif is_numeric_dtype(x_values.dtype) and not is_bool_dtype(x_values.dtype):
@@ -89,12 +50,10 @@ def plot_scatter_with_errors(
 
     figure = px.scatter(data_frame=data, x=x, y=y, **kwargs)
 
-    # ---- build shaded intervals ----
     valid = np.isfinite(coordinates)
     points = pd.DataFrame({"c": coordinates[valid], "err": errors[valid]})
     if points.empty:
         return figure
-    # One x can hold several series/rows: shade it if any of them is wrong.
     points = points.groupby("c", sort=True, as_index=False)["err"].any()
     c = points["c"].to_numpy()
     err = points["err"].to_numpy()
@@ -111,13 +70,12 @@ def plot_scatter_with_errors(
     padded = np.concatenate(([False], err, [False])).astype(int)
     diff = np.diff(padded)
     starts = np.flatnonzero(diff == 1)
-    ends = np.flatnonzero(diff == -1)  # exclusive
+    ends = np.flatnonzero(diff == -1)
     intervals = [(edges[s], edges[e]) for s, e in zip(starts, ends)]
 
     def axis_value(value: float) -> pd.Timestamp | float:
         return _EPOCH + pd.to_timedelta(value, unit="s") if datetime_axis else float(value)
 
-    # ---- add shapes; single legend entry controlling all of them ----
     label = error_name or wrong_cls
     first = len(figure.layout.shapes)
     for left, right in intervals:
