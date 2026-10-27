@@ -1,17 +1,15 @@
 """Terrain classification from wheel signals only (no IMU) with Optuna-tuned models.
 
 Features use wheel currents and wheel speeds plus the motion they imply:
-overall speed, turn rate (direction) and their amplitudes over trailing windows.
-Runs are never split between folds, so a model cannot memorize a run. Every
-model is tuned and scored with the same 5-fold run-grouped cross-validation and
-its out-of-fold predictions give the confusion matrix (each run is predicted by
-a model that never saw it).
+overall speed, turn rate (direction) and their amplitudes over trailing windows
+(see data_split.py). Every model trains on the train split, Optuna picks its
+hyperparameters by macro-F1 on the val split, and the chosen model is scored
+once on the test split. The split and the scaling are shared with all models.
 """
 
 import argparse
 import json
 import time
-from pathlib import Path
 
 import matplotlib
 
@@ -24,49 +22,12 @@ from catboost import CatBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, f1_score
-from sklearn.model_selection import StratifiedGroupKFold
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import QuantileTransformer, StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
-from Major import PipelineConfig, draw_confusion_matrix
+from data_split import DATA_DIR, SEED, Splits, load_dataset, make_splits
+from Major import draw_confusion_matrix
 
-DATA_DIR = Path(__file__).parent / "data" / "borealtc"
 OUT_DIR = DATA_DIR / "ml_classifiers"
-SAMPLE_RATE = 100  # Hz, time step is 0.01 s
-WINDOWS = {"1s": 1 * SAMPLE_RATE, "3s": 3 * SAMPLE_RATE}
-VEL_LIMIT = 1.0  # m/s, |vel| above this are logging glitches (99.9% quantile is 0.79)
-CUR_LIMIT = 40.0  # A, 99.9% quantile is ~24, the rest are spikes up to 1900
-
-
-def build_features(data: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
-    """Per-sample wheel features plus trailing-window statistics computed inside every run."""
-    d = data[["terrain", "run_idx", "time", "velL", "velR", "curL", "curR"]].copy()
-    d[["velL", "velR"]] = d[["velL", "velR"]].clip(-VEL_LIMIT, VEL_LIMIT)
-    d[["curL", "curR"]] = d[["curL", "curR"]].clip(-CUR_LIMIT, CUR_LIMIT)
-    d["speed"] = (d["velL"] + d["velR"]) / 2
-    d["omega"] = (d["velR"] - d["velL"]) / config.track_width
-    d["abs_speed"] = d["speed"].abs()
-    d["abs_omega"] = d["omega"].abs()
-    d["cur_sum"] = d["curL"] + d["curR"]
-    d["cur_diff"] = d["curL"] - d["curR"]
-
-    groups = d.groupby(["terrain", "run_idx"], sort=False)
-    for name, size in WINDOWS.items():
-        for column in ["curL", "curR", "cur_sum", "cur_diff", "speed", "omega"]:
-            rolling = groups[column].rolling(size, min_periods=1)
-            d[f"{column}_mean_{name}"] = rolling.mean().reset_index(level=[0, 1], drop=True)
-            d[f"{column}_std_{name}"] = rolling.std().reset_index(level=[0, 1], drop=True).fillna(0)
-        for column in ["speed", "omega"]:
-            high = groups[column].rolling(size, min_periods=1).max().reset_index(level=[0, 1], drop=True)
-            low = groups[column].rolling(size, min_periods=1).min().reset_index(level=[0, 1], drop=True)
-            d[f"{column}_amp_{name}"] = high - low
-    d["run"] = d["terrain"] + "_" + d["run_idx"].astype(str)
-    return d
-
-
-def feature_columns(d: pd.DataFrame) -> list[str]:
-    return [c for c in d.columns if c not in {"terrain", "run_idx", "time", "run"}]
 
 
 # ---------------------------------------------------------------- models
@@ -74,44 +35,39 @@ def feature_columns(d: pd.DataFrame) -> list[str]:
 def make_tree(trial: optuna.Trial):
     return DecisionTreeClassifier(
         criterion=trial.suggest_categorical("criterion", ["gini", "entropy"]),
-        max_depth=trial.suggest_int("max_depth", 3, 20),
+        max_depth=trial.suggest_int("max_depth", 3, 30),
         min_samples_leaf=trial.suggest_int("min_samples_leaf", 1, 1000, log=True),
         max_features=trial.suggest_categorical("max_features", [None, "sqrt", 0.5]),
         class_weight=trial.suggest_categorical("class_weight", [None, "balanced"]),
-        random_state=0,
+        random_state=SEED,
     )
 
 
 def make_forest(trial: optuna.Trial):
     return RandomForestClassifier(
         n_estimators=trial.suggest_int("n_estimators", 100, 400, step=50),
-        max_depth=trial.suggest_int("max_depth", 4, 24),
+        max_depth=trial.suggest_int("max_depth", 4, 30),
         min_samples_leaf=trial.suggest_int("min_samples_leaf", 1, 500, log=True),
         max_features=trial.suggest_float("max_features", 0.1, 0.8),
         max_samples=trial.suggest_float("max_samples", 0.3, 1.0),
         class_weight=trial.suggest_categorical("class_weight", [None, "balanced", "balanced_subsample"]),
         n_jobs=-1,
-        random_state=0,
+        random_state=SEED,
     )
 
 
 def make_logreg(trial: optuna.Trial):
-    scaler = trial.suggest_categorical("scaler", ["standard", "quantile"])
-    transform = (
-        StandardScaler() if scaler == "standard"
-        else QuantileTransformer(output_distribution="normal", n_quantiles=500, random_state=0)
-    )
-    model = LogisticRegression(
+    return LogisticRegression(
         C=trial.suggest_float("C", 1e-3, 1e2, log=True),
         class_weight=trial.suggest_categorical("class_weight", [None, "balanced"]),
         max_iter=3000,
     )
-    return make_pipeline(transform, model)
 
 
 def make_catboost(trial: optuna.Trial):
     return CatBoostClassifier(
-        iterations=trial.suggest_int("iterations", 100, 800, step=50),
+        iterations=2000,
+        early_stopping_rounds=100,
         learning_rate=trial.suggest_float("learning_rate", 0.02, 0.3, log=True),
         depth=trial.suggest_int("depth", 4, 8),
         l2_leaf_reg=trial.suggest_float("l2_leaf_reg", 1, 30, log=True),
@@ -121,7 +77,7 @@ def make_catboost(trial: optuna.Trial):
         auto_class_weights=trial.suggest_categorical("auto_class_weights", ["None", "Balanced"]),
         loss_function="MultiClass",
         thread_count=-1,
-        random_seed=0,
+        random_seed=SEED,
         verbose=False,
     )
 
@@ -132,42 +88,36 @@ MODELS = {
     "logistic_regression": make_logreg,
     "catboost": make_catboost,
 }
+TRIALS = {"decision_tree": 100, "logistic_regression": 50, "random_forest": 50, "catboost": 30}
+
+
+def fit(name: str, trial, s: Splits):
+    model = MODELS[name](trial)
+    if name == "catboost":
+        model.fit(s.x_train, s.y_train, eval_set=(s.x_val, s.y_val))
+    else:
+        model.fit(s.x_train, s.y_train)
+    return model
 
 
 def predict(model, x) -> np.ndarray:
-    return np.asarray(model.predict(x)).ravel()
+    return np.asarray(model.predict(x)).ravel().astype(int)
 
 
-# ---------------------------------------------------------------- tuning
+def tune(name: str, s: Splits, n_trials: int) -> optuna.Study:
+    def objective(trial: optuna.Trial) -> float:
+        model = fit(name, trial, s)
+        if name == "catboost":
+            trial.set_user_attr("best_iteration", model.get_best_iteration() + 1)
+        return f1_score(s.y_val, predict(model, s.x_val), average="macro")
 
-def cross_validate(name, trial, x, y, folds, report: bool = False) -> tuple[list[float], np.ndarray]:
-    """Macro-F1 per fold and out-of-fold predictions; prunes hopeless trials after each fold."""
-    scores, oof = [], np.empty(len(y), dtype=object)
-    for step, (fit_idx, valid_idx) in enumerate(folds):
-        model = MODELS[name](trial)
-        model.fit(x.iloc[fit_idx], y[fit_idx])
-        oof[valid_idx] = predict(model, x.iloc[valid_idx])
-        scores.append(f1_score(y[valid_idx], oof[valid_idx], average="macro"))
-        if report:
-            trial.report(float(np.mean(scores)), step)
-            if trial.should_prune():
-                raise optuna.TrialPruned()
-    return scores, oof
-
-
-def tune(name, x, y, folds, n_trials, seed=0) -> optuna.Study:
-    study = optuna.create_study(
-        study_name=name,
-        direction="maximize",
-        sampler=optuna.samplers.TPESampler(seed=seed),
-        pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=1),
-    )
+    study = optuna.create_study(study_name=name, direction="maximize", sampler=optuna.samplers.TPESampler(seed=SEED))
     study.optimize(
-        lambda trial: float(np.mean(cross_validate(name, trial, x, y, folds, report=True)[0])),
+        objective,
         n_trials=n_trials,
         show_progress_bar=False,
         callbacks=[lambda study, trial: print(
-            f"  {name} trial {trial.number + 1}/{n_trials}: {trial.state.name.lower()}, best {study.best_value:.3f}",
+            f"  {name} trial {trial.number + 1}/{n_trials}: val macro-F1 {trial.value:.3f}, best {study.best_value:.3f}",
             flush=True,
         )],
     )
@@ -176,7 +126,7 @@ def tune(name, x, y, folds, n_trials, seed=0) -> optuna.Study:
 
 def importances(name: str, model, features: list[str]) -> pd.Series:
     if name == "logistic_regression":
-        values = np.abs(model[-1].coef_).mean(axis=0)
+        values = np.abs(model.coef_).mean(axis=0)
     elif name == "catboost":
         values = model.get_feature_importance()
     else:
@@ -184,70 +134,75 @@ def importances(name: str, model, features: list[str]) -> pd.Series:
     return pd.Series(values / values.sum(), index=features)
 
 
-TRIALS = {"decision_tree": 60, "logistic_regression": 40, "random_forest": 30, "catboost": 30}
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stride", type=int, default=20, help="keep every n-th sample (100 Hz is highly autocorrelated)")
     parser.add_argument("--trials", type=int, default=None, help="trials per model (default: TRIALS)")
     parser.add_argument("--models", nargs="+", default=list(TRIALS), choices=list(MODELS))
+    parser.add_argument("--out", default=str(OUT_DIR))
     args = parser.parse_args()
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     pd.set_option("display.width", 200)
     pd.set_option("display.max_columns", None)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = type(OUT_DIR)(args.out)
+    out.mkdir(parents=True, exist_ok=True)
 
-    raw = pd.read_csv(DATA_DIR / "merged_interpolation.csv")
-    raw = raw[raw["terrain"] != "SANDY_LOAM"]
-    data = build_features(raw, PipelineConfig())
-    data = data.groupby("run", sort=False).nth(slice(None, None, args.stride)).reset_index(drop=True)
-    features = feature_columns(data)
-    x, y = data[features], data["terrain"].to_numpy()
+    s = make_splits(load_dataset(args.stride))
+    shares = s.shares()
+    shares.to_csv(out / "split_shares.csv")
+    sizes = pd.Series({"train": len(s.train), "val": len(s.val), "test": len(s.test)}, name="rows")
+    print(f"{len(s.features)} features, stride {args.stride}, seed {SEED}")
+    print(pd.DataFrame({"rows": sizes, "share_%": sizes / sizes.sum() * 100}).round(1))
+    print("\nSurface share inside each split, %:")
+    print(shares.round(2), "\n")
 
-    folds = list(StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=0).split(x, y, groups=data["run"]))
-    split = pd.DataFrame(
-        [data.iloc[valid].groupby("terrain")["run"].nunique().rename(f"fold{i}") for i, (_, valid) in enumerate(folds)]
-    ).fillna(0).astype(int)
-    split.to_csv(OUT_DIR / "fold_runs.csv")
-    print(f"{len(features)} features, stride {args.stride}, {len(data)} rows\nValidation runs per fold:\n{split}\n")
-
+    labels = s.encoder.classes_
     summary, per_terrain = [], {}
     for name in args.models:
         started = time.time()
-        study = tune(name, x, y, folds, args.trials or TRIALS[name])
-        study.trials_dataframe().to_csv(OUT_DIR / f"{name}_trials.csv", index=False)
-        scores, oof = cross_validate(name, optuna.trial.FixedTrial(study.best_params), x, y, folds)
+        study = tune(name, s, args.trials or TRIALS[name])
+        study.trials_dataframe().to_csv(out / f"{name}_trials.csv", index=False)
+        model = fit(name, optuna.trial.FixedTrial(study.best_params), s)
+        val_pred, test_pred = predict(model, s.x_val), predict(model, s.x_test)
 
-        report = pd.DataFrame(classification_report(y, oof, output_dict=True, zero_division=0)).T
-        per_terrain[name] = report.loc[sorted(set(y)), "recall"]
-        confusion = pd.crosstab(pd.Series(y, name="terrain"), pd.Series(oof, name="predicted"))
-        figure = draw_confusion_matrix(confusion, f"{name}: out-of-fold, per measurement")
-        figure.savefig(OUT_DIR / f"{name}_confusion.png", dpi=150)
+        report = pd.DataFrame(classification_report(
+            s.y_test, test_pred, labels=range(len(labels)), target_names=labels, output_dict=True, zero_division=0
+        )).T
+        per_terrain[name] = report.loc[labels, "recall"]
+        report.to_csv(out / f"{name}_classification_report.csv")
+        (out / f"{name}_classification_report.txt").write_text(classification_report(
+            s.y_test, test_pred, labels=range(len(labels)), target_names=labels, digits=3, zero_division=0
+        ), encoding="utf-8")
+        confusion = pd.crosstab(
+            pd.Series(s.encoder.inverse_transform(s.y_test), name="terrain"),
+            pd.Series(s.encoder.inverse_transform(test_pred), name="predicted"),
+        ).reindex(index=labels, columns=labels, fill_value=0)
+        figure = draw_confusion_matrix(confusion, f"{name}: test split, per measurement")
+        figure.savefig(out / f"{name}_confusion.png", dpi=150)
         plt.close(figure)
-        model = MODELS[name](optuna.trial.FixedTrial(study.best_params)).fit(x, y)
-        importances(name, model, features).sort_values(ascending=False).to_csv(
-            OUT_DIR / f"{name}_importance.csv", header=["importance"]
+        importances(name, model, s.features).sort_values(ascending=False).to_csv(
+            out / f"{name}_importance.csv", header=["importance"]
         )
-        (OUT_DIR / f"{name}_best_params.json").write_text(json.dumps(study.best_params, indent=2), encoding="utf-8")
+        params = dict(study.best_params)
+        if name == "catboost":
+            params["iterations"] = study.best_trial.user_attrs["best_iteration"]
+        (out / f"{name}_best_params.json").write_text(json.dumps(params, indent=2), encoding="utf-8")
         summary.append({
             "model": name,
-            "macro_f1": f1_score(y, oof, average="macro"),
-            "fold_f1_mean": np.mean(scores),
-            "fold_f1_std": np.std(scores),
-            "accuracy": accuracy_score(y, oof),
+            "val_macro_f1": f1_score(s.y_val, val_pred, average="macro"),
+            "test_macro_f1": f1_score(s.y_test, test_pred, average="macro"),
+            "test_accuracy": accuracy_score(s.y_test, test_pred),
             "trials": len(study.trials),
-            "pruned": sum(t.state == optuna.trial.TrialState.PRUNED for t in study.trials),
             "minutes": (time.time() - started) / 60,
         })
-        print(pd.DataFrame(summary).set_index("model").round(3).tail(1), "\n", study.best_params, "\n", flush=True)
+        print(pd.DataFrame(summary).set_index("model").round(3).tail(1), "\n", params, "\n", flush=True)
 
     summary = pd.DataFrame(summary).set_index("model")
     recall = pd.DataFrame(per_terrain).T
-    summary.to_csv(OUT_DIR / "summary.csv")
-    recall.to_csv(OUT_DIR / "recall_by_terrain.csv")
+    summary.to_csv(out / "summary.csv")
+    recall.to_csv(out / "recall_by_terrain.csv")
     print(summary.round(3))
-    print("\nRecall by terrain (out-of-fold):")
+    print("\nRecall by terrain on the test split:")
     print(recall.round(3))
 
 
