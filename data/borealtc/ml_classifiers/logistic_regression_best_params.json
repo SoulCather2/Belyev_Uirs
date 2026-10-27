@@ -1,0 +1,5 @@
+{
+  "scaler": "standard",
+  "C": 0.003346173171085769,
+  "class_weight": "balanced"
+}

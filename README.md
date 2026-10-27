@@ -25,14 +25,17 @@ The input dataset is expected at `data/borealtc/merged_interpolation.csv`. Repor
 | `optimize_hyperparameters.py` | Runs Optuna hyperparameter optimization. For every trial it filters the raw signals, recalculates `Ke`, trains the DCT models, evaluates the classifier, and saves the best parameters and trial history. |
 | `analyze_best_dct_models.py` | Rebuilds the DCT models using the best Optuna trial, generates analytical formulas, exports cosine coefficients, and compares the selected DCT positions between surfaces. |
 | `print_dct_models.py` | Reads saved DCT coefficients and renders the analytical surface formulas as HTML with MathJax or prints the formula source to the console. |
-| `plot_errors.py` | Standalone plotting module (numpy, pandas, plotly only): `plot_scatter_with_errors` shades classifier-error intervals; `plot_run` plots one run of a dataset with predictions, one panel per signal. |
+| `plot_errors.py` | Standalone plotting module (numpy, pandas, plotly only): `plot_scatter_with_errors` shades classifier-error intervals; `plot_run` plots one run of the predictions dataset, one panel per signal. |
+| `export_predictions.py` | Classifies every cleaned measurement with the saved DCT models and writes `data/borealtc/dataset_with_predictions.csv.gz` (all original columns plus `predicted_terrain`, `raw_predicted_terrain`, `wrong`, `raw_wrong`). |
+| `train_classifiers.py` | Classifies terrain from wheel signals only (no IMU): wheel currents, wheel speeds, overall speed and turn rate with 1 s / 3 s trailing-window means, deviations and amplitudes. Tunes a decision tree, random forest, logistic regression and CatBoost with Optuna on 5-fold run-grouped cross-validation and writes metrics, out-of-fold confusion matrices, feature importances and best parameters to `data/borealtc/ml_classifiers/`. |
+| `compare_dct_positions.py` | Lists nonzero DCT coefficient indices for every surface in the baseline and best models, groups identical index sets, and generates green/red pairwise comparison matrices. |
 
 ## Interactive scatter plots
 
 `plot_errors.plot_scatter_with_errors` wraps `plotly.express.scatter` and shades
 precomputed classifier-error intervals in red. Pass ordinary Plotly Express
-options such as `template` through keyword arguments; `y` can be one column or
-a list of columns:
+options through keyword arguments (the template defaults to `plotly_white`);
+`y` can be one column or a list of columns:
 
 ```python
 from plot_errors import plot_scatter_with_errors
@@ -42,7 +45,6 @@ figure = plot_scatter_with_errors(
     x="time",
     y=["robot_omega", "robot_vel"],
     wrong_cls="wrong_cls",
-    template="plotly_white",
 )
 figure.show()
 ```
@@ -50,7 +52,30 @@ figure.show()
 The error column must contain booleans or 0/1 values; missing values are
 treated as correct. The function does not calculate classification results.
 The x column must be numeric or datetime-like so error intervals can be
-located. All error bands share one legend item and can be toggled together.
+located. Error bands are drawn as filled traces in one legend group, so one
+legend click hides or shows them on every facet panel. With `share_y=False`
+facet panels get independent y scales (used by `plot_run`). Margins are kept
+small and the legend sits above the plot, so the chart uses the full width.
+
+### Full dataset with predictions
+
+After `python Major.py` has written the cleaned data and `dct_models.pkl`, build
+the per-measurement predictions dataset (about 520k rows, ~55 MB, git-ignored):
+
+```powershell
+python export_predictions.py                 # memory carried between runs, as in Major.py
+python export_predictions.py --reset-memory  # memory reset at the start of every run
+```
+
+Then plot any run with its errors shaded:
+
+```python
+import pandas as pd
+from plot_errors import plot_run
+
+data = pd.read_csv("data/borealtc/dataset_with_predictions.csv.gz")
+plot_run(data, "SNOW", 2, y=["omega", "Ke", "speed"]).show()
+```
 
 ## Classifier error analysis
 
@@ -65,7 +90,8 @@ makes mistakes:
 | `model_separation` | Distance between every pair of surface models, in units of their pooled spread, along the common `omega` range. |
 | `pick_example_runs` | Selects the worst run and runs with a mix of correct and wrong predictions for every terrain. |
 | `save_example_plots` | Saves interactive HTML plots of the selected runs (one panel per signal) with classifier-error intervals shaded in red. |
-| `run_error_analysis` | Runs the whole analysis and writes the CSV summaries (`1_error_by_terrain.csv` … `7_model_separation.csv`, `samples_with_errors.csv.gz`) and example plots to `data/borealtc/error_analysis/`. |
+| `draw_confusion_matrix` | Draws a row-normalized confusion matrix; every cell shows the percent of its true terrain and the count. |
+| `run_error_analysis` | Runs the whole analysis and writes the CSV summaries (`1_error_by_terrain.csv` … `7_model_separation.csv`, `samples_with_errors.csv.gz`), the per-measurement confusion matrix `2_confusion_per_sample.png`, and example plots to `data/borealtc/error_analysis/`. |
 
 The example plots are committed in `data/borealtc/error_analysis/example_plots/`
 (`worst_<TERRAIN>_run<N>.html` and `mixed_<TERRAIN>_run<N>.html`).
@@ -115,7 +141,7 @@ The repository includes representative median `Ke` plots for ASPHALT, FLOORING, 
 | --- | --- |
 | `data/borealtc/classification_report.txt` | Human-readable precision, recall, F1-score, and accuracy report. |
 | `data/borealtc/classification_report.csv` | Tabular version of the classification metrics. |
-| `data/borealtc/dct_confusion_matrix.png` | Visual row-normalized confusion matrix for terrain classification. |
+| `data/borealtc/dct_confusion_matrix.png` | Row-normalized confusion matrix for terrain classification; cells show percents of the true terrain and counts. |
 | `data/borealtc/dct_confusion_matrix.csv` | Row-normalized confusion matrix values. |
 | `data/borealtc/dct_confusion_matrix_counts.csv` | Raw confusion-matrix counts. |
 
@@ -125,6 +151,19 @@ The repository includes representative median `Ke` plots for ASPHALT, FLOORING, 
 | --- | --- |
 | `data/borealtc/best_dct_cosine_coefficients.txt` | Human-readable nonzero coefficients multiplying cosine terms for the best trial. |
 | `data/borealtc/best_dct_formula_similarity.txt` | Comparison of selected DCT positions and overlap between ASPHALT, FLOORING, ICE, and SNOW formulas. |
+| `data/borealtc/dct_position_comparison_by_surface.txt` | Sorted nonzero coefficient indices per surface and groups of surfaces with identical index sets for the baseline and best models. |
+| `data/borealtc/dct_position_matrix_baseline.html` | Plotly pairwise surface matrix for baseline coefficient-index sets (green = identical, red = different); hover shows the XOR count and differing coefficient indices. |
+| `data/borealtc/dct_position_matrix_best.html` | Plotly pairwise surface matrix for best-model coefficient-index sets (green = identical, red = different); hover shows the XOR count and differing coefficient indices. |
+| `data/borealtc/dct_position_matrix_baseline_vs_best.html` | Plotly cross-model matrix: baseline surfaces by row, best-model surfaces by column; hover shows the XOR count and differing coefficient indices. |
+| `data/borealtc/dct_coefficient_position_matrix.html` | Per-surface baseline-versus-best matrix across coefficient indices (green = same selection state, red = different). |
+
+Regenerate the per-surface index lists and comparison matrices with:
+
+```powershell
+python compare_dct_positions.py
+```
+
+The pairwise Plotly matrices are saved as standalone HTML files that load Plotly from its CDN. Each cell shows the size of the symmetric difference (XOR) between the two surfaces' coefficient-index sets; hover over a cell to see the count, the XOR indices, and which indices occur only in each surface.
 
 ### Visual results
 

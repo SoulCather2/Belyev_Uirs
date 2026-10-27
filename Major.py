@@ -743,6 +743,34 @@ def generate_classification_report(
     return float(accuracy), report_text, report_df
 
 
+def draw_confusion_matrix(counts: pd.DataFrame, title: str) -> plt.Figure:
+    """Row-normalized confusion matrix: each cell shows the percent of its true terrain and the count."""
+    matrix = counts.to_numpy(dtype=float)
+    row_totals = matrix.sum(axis=1, keepdims=True)
+    percent = np.divide(matrix, row_totals, out=np.zeros_like(matrix), where=row_totals != 0) * 100
+
+    figure, axis = plt.subplots(figsize=(7, 5.5))
+    image = axis.imshow(percent, cmap="Blues", vmin=0, vmax=100)
+    colorbar = figure.colorbar(image, ax=axis, format="%d%%")
+    colorbar.set_label("Share of true terrain, %")
+    axis.set(
+        xlabel="Predicted terrain",
+        ylabel="True terrain",
+        title=title,
+        xticks=np.arange(counts.shape[1]),
+        yticks=np.arange(counts.shape[0]),
+        xticklabels=counts.columns,
+        yticklabels=counts.index,
+    )
+    for row in range(matrix.shape[0]):
+        for column in range(matrix.shape[1]):
+            color = "white" if percent[row, column] > 50 else "black"
+            label = f"{percent[row, column]:.1f}%\n({int(matrix[row, column])})"
+            axis.text(column, row, label, ha="center", va="center", color=color)
+    figure.tight_layout()
+    return figure
+
+
 def plot_confusion_matrix(
     classification: pd.DataFrame, 
     output_dir: Path | None = None
@@ -759,23 +787,8 @@ def plot_confusion_matrix(
     normalized_df = pd.DataFrame(normalized, index=labels, columns=labels)
     raw_df = pd.DataFrame(matrix, index=labels, columns=labels)
 
-    figure, axis = plt.subplots(figsize=(8, 6))
-    image = axis.imshow(normalized, cmap="Blues", vmin=0, vmax=1)
-    figure.colorbar(image, ax=axis, label="Recall")
-    axis.set(
-        xlabel="Predicted terrain",
-        ylabel="True terrain",
-        title="DCT classifier confusion matrix",
-        xticks=np.arange(len(labels)),
-        yticks=np.arange(len(labels)),
-        xticklabels=labels,
-        yticklabels=labels,
-    )
-    for row in range(len(labels)):
-        for column in range(len(labels)):
-            axis.text(column, row, f"{normalized[row, column]:.2f}", ha="center", va="center")
-    figure.tight_layout()
-    
+    figure = draw_confusion_matrix(raw_df, "DCT classifier confusion matrix (experiments)")
+
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
         normalized_df.to_csv(output_dir / "dct_confusion_matrix.csv")
@@ -918,11 +931,10 @@ def save_example_plots(s: pd.DataFrame, by_run: pd.DataFrame, out_dir: Path, y=N
         long = part.melt(id_vars=[x, "wrong"], value_vars=signals, var_name="signal", value_name="value")
         fig = plot_scatter_with_errors(
             long, x=x, y="value", wrong_cls="wrong", facet_row="signal", color="signal",
-            error_name="Ошибка классификатора",
+            error_name="Ошибка классификатора", share_y=False,
             title=f"Поверхность: {row['terrain']}, прогон {row['run_idx']} "
                   f"(ошибок {row['error_rate']:.0%}, {row['kind']})",
         )
-        fig.update_yaxes(matches=None)
         fig.update_traces(marker_size=4)
         fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
         path = out_dir / f"{row['kind']}_{row['terrain']}_run{row['run_idx']}.html"
@@ -953,7 +965,11 @@ def run_error_analysis(cleaned, dct_models, dct_models_std, config, out_dir: Pat
     by_terrain.to_csv(out_dir / "1_error_by_terrain.csv", index=False)
  
     # 2. Which surface is mistaken for which.
-    pd.crosstab(s["terrain"], s["predicted_terrain"]).to_csv(out_dir / "2_confusion_per_sample.csv")
+    confusion = pd.crosstab(s["terrain"], s["predicted_terrain"])
+    confusion.to_csv(out_dir / "2_confusion_per_sample.csv")
+    figure = draw_confusion_matrix(confusion, "Confusion matrix per measurement (memory reset per run)")
+    figure.savefig(out_dir / "2_confusion_per_sample.png", dpi=150)
+    plt.close(figure)
  
     # 3. Errors against features.
     features = [c for c in ["abs_omega", "omega", "abs_speed", "cur_mean", "cur_diff", "Ke", "amplitude"] if c in s.columns]
