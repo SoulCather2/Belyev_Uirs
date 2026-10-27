@@ -1,0 +1,7 @@
+{
+  "criterion": "gini",
+  "max_depth": 24,
+  "min_samples_leaf": 1,
+  "max_features": null,
+  "class_weight": "balanced"
+}

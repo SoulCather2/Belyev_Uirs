@@ -1,0 +1,15 @@
+{
+  "hidden": [
+    276,
+    206,
+    329
+  ],
+  "dropout": 0.38543737622098667,
+  "activation": "leaky_relu",
+  "lr": 0.008536869578630462,
+  "weight_decay": 0.014627046970006063,
+  "class_weight": "none",
+  "batch": 19881,
+  "best_epoch": 110,
+  "epochs": 170
+}

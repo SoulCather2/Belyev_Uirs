@@ -1,5 +1,4 @@
 {
-  "scaler": "standard",
-  "C": 0.003346173171085769,
-  "class_weight": "balanced"
+  "C": 0.008259114011285642,
+  "class_weight": null
 }
