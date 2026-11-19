@@ -1,0 +1,10 @@
+              precision    recall  f1-score   support
+
+     ASPHALT      0.738     0.663     0.698       513
+    FLOORING      0.927     0.947     0.936      2025
+         ICE      0.967     0.964     0.965      2085
+        SNOW      0.878     0.886     0.882      1433
+
+    accuracy                          0.914      6056
+   macro avg      0.877     0.865     0.871      6056
+weighted avg      0.913     0.914     0.913      6056

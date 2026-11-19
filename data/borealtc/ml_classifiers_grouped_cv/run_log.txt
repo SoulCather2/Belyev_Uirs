@@ -1,0 +1,42 @@
+38 features, stride 20, 32397 rows
+Validation runs per fold:
+terrain  ASPHALT  FLOORING  ICE  SNOW
+fold0          2         4    2     3
+fold1          1         2    4     5
+fold2          4         2    1     4
+fold3          0         1    1     9
+fold4          0         1    5     6
+
+               macro_f1  fold_f1_mean  fold_f1_std  accuracy  trials  pruned  minutes
+model                                                                                
+decision_tree     0.668         0.629         0.07      0.72      60      41    1.427 
+ {'criterion': 'entropy', 'max_depth': 18, 'min_samples_leaf': 5, 'max_features': 'sqrt', 'class_weight': 'balanced'} 
+
+                     macro_f1  fold_f1_mean  fold_f1_std  accuracy  trials  pruned  minutes
+model                                                                                      
+logistic_regression     0.589         0.537        0.091     0.622      40      19     1.31 
+ {'scaler': 'standard', 'C': 0.003346173171085769, 'class_weight': 'balanced'} 
+
+               macro_f1  fold_f1_mean  fold_f1_std  accuracy  trials  pruned  minutes
+model                                                                                
+random_forest     0.703         0.664        0.088     0.756      30      10    10.04 
+ {'n_estimators': 250, 'max_depth': 21, 'min_samples_leaf': 43, 'max_features': 0.17519634647046411, 'max_samples': 0.4826411344106383, 'class_weight': 'balanced'} 
+
+          macro_f1  fold_f1_mean  fold_f1_std  accuracy  trials  pruned  minutes
+model                                                                           
+catboost     0.751         0.711         0.11     0.816      30      16     60.5 
+ {'iterations': 650, 'learning_rate': 0.08515562811287886, 'depth': 8, 'l2_leaf_reg': 4.4736166890060485, 'random_strength': 0.35096303294115727, 'subsample': 0.8595519941355626, 'auto_class_weights': 'Balanced'} 
+
+                     macro_f1  fold_f1_mean  fold_f1_std  accuracy  trials  pruned  minutes
+model                                                                                      
+decision_tree           0.668         0.629        0.070     0.720      60      41    1.427
+logistic_regression     0.589         0.537        0.091     0.622      40      19    1.310
+random_forest           0.703         0.664        0.088     0.756      30      10   10.040
+catboost                0.751         0.711        0.110     0.816      30      16   60.500
+
+Recall by terrain (out-of-fold):
+                     ASPHALT  FLOORING    ICE   SNOW
+decision_tree          0.512     0.883  0.582  0.780
+logistic_regression    0.601     0.726  0.541  0.608
+random_forest          0.624     0.954  0.615  0.740
+catboost               0.526     0.974  0.770  0.771

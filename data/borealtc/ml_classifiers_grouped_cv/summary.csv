@@ -1,0 +1,5 @@
+model,macro_f1,fold_f1_mean,fold_f1_std,accuracy,trials,pruned,minutes
+decision_tree,0.668,0.629,0.07,0.72,60,41,1.427
+logistic_regression,0.589,0.537,0.091,0.622,40,19,1.31
+random_forest,0.703,0.664,0.088,0.756,30,10,10.04
+catboost,0.751,0.711,0.11,0.816,30,16,60.5

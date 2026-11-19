@@ -1,0 +1,24 @@
+{
+  "window_s": 1.8,
+  "step": 5,
+  "encoder": [
+    407,
+    109,
+    67
+  ],
+  "gru_units": 62,
+  "bidirectional": false,
+  "head": [
+    23,
+    71,
+    44
+  ],
+  "dropout": 0.19110612877570768,
+  "activation": "silu",
+  "lr": 0.001929270393570435,
+  "weight_decay": 0.006431806112843508,
+  "class_weight": "balanced",
+  "batch": 10624,
+  "best_epoch": 96,
+  "epochs": 136
+}

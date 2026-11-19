@@ -1,0 +1,17 @@
+{
+  "hidden": [
+    124,
+    31,
+    550,
+    19,
+    78
+  ],
+  "dropout": 0.21310546421183202,
+  "activation": "silu",
+  "lr": 0.005035519770431701,
+  "weight_decay": 0.0022857872320400856,
+  "class_weight": "none",
+  "batch": 19881,
+  "best_epoch": 158,
+  "epochs": 218
+}

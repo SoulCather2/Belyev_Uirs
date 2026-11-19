@@ -1,0 +1,37 @@
+device: NVIDIA GeForce RTX 5060
+16 features per step: ['velL', 'velR', 'curL', 'curR', 'speed', 'omega', 'abs_speed', 'abs_omega', 'cur_sum', 'cur_diff', 'power_L', 'power_R', 'd_speed', 'd_omega', 'd_cur_sum', 'd_cur_diff']
+Surface share inside each split, %:
+          train    val   test
+terrain                      
+ASPHALT    8.76   9.46   8.47
+FLOORING  33.00  34.55  33.44
+ICE       35.49  37.84  34.43
+SNOW      22.75  18.15  23.66 
+
+  trial 1/80: complete, val macro-F1 0.867, best 0.867, 1.8 min
+  trial 2/80: complete, val macro-F1 0.908, best 0.908, 1.9 min
+  trial 3/80: complete, val macro-F1 0.953, best 0.953, 3.1 min
+  trial 4/80: complete, val macro-F1 0.857, best 0.953, 3.3 min
+  trial 5/80: complete, val macro-F1 0.938, best 0.953, 3.9 min
+  trial 6/80: complete, val macro-F1 0.727, best 0.953, 4.0 min
+  trial 7/80: complete, val macro-F1 0.953, best 0.953, 4.3 min
+  trial 8/80: complete, val macro-F1 0.883, best 0.953, 5.3 min
+  trial 9/80: complete, val macro-F1 0.930, best 0.953, 123.5 min
+
+ {'window_s': 2.0, 'step': 5, 'encoder': [167, 412], 'gru_units': 20, 'bidirectional': False, 'head': [48], 'dropout': 0.194338644844741, 'activation': 'gelu', 'lr': 0.00019135880487692312, 'weight_decay': 0.010256162748473083, 'class_weight': 'balanced', 'batch': 10368, 'best_epoch': 359, 'epochs': 399}
+       val_macro_f1  test_macro_f1  test_accuracy  trials  pruned  minutes
+model                                                                     
+gru           0.953          0.857            0.9       9       0  168.839
+
+Classification report on the test split:
+              precision    recall  f1-score   support
+
+     ASPHALT      0.678     0.694     0.686       513
+    FLOORING      0.912     0.942     0.926      2025
+         ICE      0.972     0.939     0.955      2085
+        SNOW      0.862     0.857     0.860      1433
+
+    accuracy                          0.900      6056
+   macro avg      0.856     0.858     0.857      6056
+weighted avg      0.901     0.900     0.900      6056
+

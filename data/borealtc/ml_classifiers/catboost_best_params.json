@@ -1,0 +1,9 @@
+{
+  "learning_rate": 0.07303389590951043,
+  "depth": 6,
+  "l2_leaf_reg": 1.0168663664262163,
+  "random_strength": 6.3580206248271915,
+  "subsample": 0.638844726400535,
+  "auto_class_weights": "Balanced",
+  "iterations": 274
+}

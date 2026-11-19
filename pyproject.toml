@@ -9,12 +9,27 @@ description = "Terrain classification and kinetic-energy analysis using DCT mode
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "catboost>=1.2.10",
     "matplotlib>=3.7",
     "numpy>=1.24",
+    "optuna>=3.6",
     "pandas>=2.0",
+    "plotly>=5.16",
     "scikit-learn>=1.3",
     "scipy>=1.10",
+    "seaborn>=0.13.2",
+    "tensorboard>=2.17",
+    "torch>=2.7",
 ]
+
+# RTX 50xx (Blackwell) needs a CUDA 12.8+ build of PyTorch.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
 
 [tool.setuptools]
 py-modules = ["Osnova"]

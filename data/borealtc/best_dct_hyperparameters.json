@@ -1,0 +1,17 @@
+{
+  "accuracy": 0.5789473684210527,
+  "trial": 21,
+  "parameters": {
+    "classified_experiments": 57,
+    "memory_margin": 0.32952224820710885,
+    "n_bins": 71,
+    "n_dct_coefficients": 28,
+    "window_size": 30
+  },
+  "suggestions": {
+    "window_size": 29.944398034287527,
+    "n_bins": 69.68538242261533,
+    "n_dct_coefficients": 28.47509658817363,
+    "memory_margin": 0.32952224820710885
+  }
+}

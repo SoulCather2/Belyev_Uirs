@@ -1,0 +1,88 @@
+device: NVIDIA GeForce RTX 5060
+16 features per step: ['velL', 'velR', 'curL', 'curR', 'speed', 'omega', 'abs_speed', 'abs_omega', 'cur_sum', 'cur_diff', 'power_L', 'power_R', 'd_speed', 'd_omega', 'd_cur_sum', 'd_cur_diff']
+Surface share inside each split, %:
+          train    val   test
+terrain                      
+ASPHALT    8.76   9.46   8.47
+FLOORING  33.00  34.55  33.44
+ICE       35.49  37.84  34.43
+SNOW      22.75  18.15  23.66 
+
+  trial 1/60: complete, val macro-F1 0.891, best 0.891, 1.3 min
+  trial 2/60: complete, val macro-F1 0.689, best 0.891, 1.3 min
+  trial 3/60: complete, val macro-F1 0.917, best 0.917, 1.6 min
+  trial 4/60: complete, val macro-F1 0.894, best 0.917, 1.8 min
+  trial 5/60: complete, val macro-F1 0.868, best 0.917, 2.0 min
+  trial 6/60: complete, val macro-F1 0.931, best 0.931, 2.3 min
+  trial 7/60: complete, val macro-F1 0.685, best 0.931, 2.5 min
+  trial 8/60: complete, val macro-F1 0.706, best 0.931, 2.8 min
+  trial 9/60: pruned, val macro-F1 0.691, best 0.931, 3.0 min
+  trial 10/60: complete, val macro-F1 0.912, best 0.931, 4.4 min
+  trial 11/60: complete, val macro-F1 0.880, best 0.931, 4.6 min
+  trial 12/60: complete, val macro-F1 0.919, best 0.931, 4.9 min
+  trial 13/60: complete, val macro-F1 0.934, best 0.934, 5.4 min
+  trial 14/60: complete, val macro-F1 0.946, best 0.946, 6.4 min
+  trial 15/60: complete, val macro-F1 0.945, best 0.946, 7.9 min
+  trial 16/60: complete, val macro-F1 0.965, best 0.965, 8.9 min
+  trial 17/60: complete, val macro-F1 0.932, best 0.965, 9.9 min
+  trial 18/60: pruned, val macro-F1 0.813, best 0.965, 10.0 min
+  trial 19/60: complete, val macro-F1 0.958, best 0.965, 11.3 min
+  trial 20/60: complete, val macro-F1 0.932, best 0.965, 11.8 min
+  trial 21/60: pruned, val macro-F1 0.819, best 0.965, 12.0 min
+  trial 22/60: pruned, val macro-F1 0.794, best 0.965, 12.0 min
+  trial 23/60: pruned, val macro-F1 0.900, best 0.965, 12.2 min
+  trial 24/60: complete, val macro-F1 0.940, best 0.965, 12.8 min
+  trial 25/60: complete, val macro-F1 0.953, best 0.965, 14.0 min
+  trial 26/60: complete, val macro-F1 0.952, best 0.965, 15.5 min
+  trial 27/60: complete, val macro-F1 0.956, best 0.965, 16.0 min
+  trial 28/60: complete, val macro-F1 0.956, best 0.965, 16.8 min
+  trial 29/60: pruned, val macro-F1 0.896, best 0.965, 17.5 min
+  trial 30/60: complete, val macro-F1 0.956, best 0.965, 18.6 min
+  trial 31/60: complete, val macro-F1 0.961, best 0.965, 19.1 min
+  trial 32/60: complete, val macro-F1 0.937, best 0.965, 19.9 min
+  trial 33/60: complete, val macro-F1 0.955, best 0.965, 20.6 min
+  trial 34/60: complete, val macro-F1 0.946, best 0.965, 50.4 min
+  trial 35/60: complete, val macro-F1 0.953, best 0.965, 51.3 min
+  trial 36/60: pruned, val macro-F1 0.917, best 0.965, 51.9 min
+  trial 37/60: pruned, val macro-F1 0.882, best 0.965, 52.2 min
+  trial 38/60: pruned, val macro-F1 0.845, best 0.965, 52.4 min
+  trial 39/60: pruned, val macro-F1 0.829, best 0.965, 52.8 min
+  trial 40/60: complete, val macro-F1 0.958, best 0.965, 56.4 min
+  trial 41/60: complete, val macro-F1 0.939, best 0.965, 57.1 min
+  trial 42/60: complete, val macro-F1 0.954, best 0.965, 58.0 min
+  trial 43/60: pruned, val macro-F1 0.923, best 0.965, 58.4 min
+  trial 44/60: pruned, val macro-F1 0.921, best 0.965, 58.7 min
+  trial 45/60: pruned, val macro-F1 0.926, best 0.965, 59.0 min
+  trial 46/60: pruned, val macro-F1 0.939, best 0.965, 59.7 min
+  trial 47/60: pruned, val macro-F1 0.922, best 0.965, 60.7 min
+  trial 48/60: pruned, val macro-F1 0.796, best 0.965, 60.9 min
+  trial 49/60: pruned, val macro-F1 0.936, best 0.965, 61.3 min
+  trial 50/60: pruned, val macro-F1 0.933, best 0.965, 61.6 min
+  trial 51/60: pruned, val macro-F1 0.897, best 0.965, 62.0 min
+  trial 52/60: pruned, val macro-F1 0.932, best 0.965, 63.1 min
+  trial 53/60: complete, val macro-F1 0.948, best 0.965, 64.0 min
+  trial 54/60: pruned, val macro-F1 0.794, best 0.965, 64.3 min
+  trial 55/60: pruned, val macro-F1 0.862, best 0.965, 64.8 min
+  trial 56/60: complete, val macro-F1 0.956, best 0.965, 65.3 min
+  trial 57/60: complete, val macro-F1 0.942, best 0.965, 65.9 min
+  trial 58/60: complete, val macro-F1 0.953, best 0.965, 66.8 min
+  trial 59/60: pruned, val macro-F1 0.823, best 0.965, 67.5 min
+  trial 60/60: complete, val macro-F1 0.958, best 0.965, 69.1 min
+
+ {'window_s': 0.8, 'step': 5, 'encoder': [57, 16], 'gru_units': 153, 'gru_layers': 2, 'bidirectional': True, 'dropout': 0.3606760626882864, 'activation': 'silu', 'lr': 0.006819684001372871, 'weight_decay': 0.02281162303058991, 'class_weight': 'none', 'batch': 8192, 'best_epoch': 110, 'epochs': 150}
+       val_macro_f1  test_macro_f1  test_accuracy  trials  pruned  minutes
+model                                                                     
+gru           0.965          0.831          0.893      60      23   70.066
+
+Classification report on the test split:
+              precision    recall  f1-score   support
+
+     ASPHALT      0.659     0.524     0.584       513
+    FLOORING      0.906     0.930     0.918      2025
+         ICE      0.944     0.967     0.955      2085
+        SNOW      0.866     0.867     0.866      1433
+
+    accuracy                          0.893      6056
+   macro avg      0.844     0.822     0.831      6056
+weighted avg      0.889     0.893     0.890      6056
+
