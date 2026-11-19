@@ -1,0 +1,285 @@
+window 0.8 s read every 5 samples: 16 steps x 16 features
+  decision_tree trial 1/100: val macro-F1 0.785, best 0.785
+  decision_tree trial 2/100: val macro-F1 0.698, best 0.785
+  decision_tree trial 3/100: val macro-F1 0.883, best 0.883
+  decision_tree trial 4/100: val macro-F1 0.716, best 0.883
+  decision_tree trial 5/100: val macro-F1 0.806, best 0.883
+  decision_tree trial 6/100: val macro-F1 0.747, best 0.883
+  decision_tree trial 7/100: val macro-F1 0.677, best 0.883
+  decision_tree trial 8/100: val macro-F1 0.888, best 0.888
+  decision_tree trial 9/100: val macro-F1 0.751, best 0.888
+  decision_tree trial 10/100: val macro-F1 0.585, best 0.888
+  decision_tree trial 11/100: val macro-F1 0.754, best 0.888
+  decision_tree trial 12/100: val macro-F1 0.861, best 0.888
+  decision_tree trial 13/100: val macro-F1 0.884, best 0.888
+  decision_tree trial 14/100: val macro-F1 0.864, best 0.888
+  decision_tree trial 15/100: val macro-F1 0.819, best 0.888
+  decision_tree trial 16/100: val macro-F1 0.809, best 0.888
+  decision_tree trial 17/100: val macro-F1 0.846, best 0.888
+  decision_tree trial 18/100: val macro-F1 0.754, best 0.888
+  decision_tree trial 19/100: val macro-F1 0.775, best 0.888
+  decision_tree trial 20/100: val macro-F1 0.781, best 0.888
+  decision_tree trial 21/100: val macro-F1 0.784, best 0.888
+  decision_tree trial 22/100: val macro-F1 0.795, best 0.888
+  decision_tree trial 23/100: val macro-F1 0.892, best 0.892
+  decision_tree trial 24/100: val macro-F1 0.823, best 0.892
+  decision_tree trial 25/100: val macro-F1 0.859, best 0.892
+  decision_tree trial 26/100: val macro-F1 0.859, best 0.892
+  decision_tree trial 27/100: val macro-F1 0.855, best 0.892
+  decision_tree trial 28/100: val macro-F1 0.823, best 0.892
+  decision_tree trial 29/100: val macro-F1 0.837, best 0.892
+  decision_tree trial 30/100: val macro-F1 0.851, best 0.892
+  decision_tree trial 31/100: val macro-F1 0.851, best 0.892
+  decision_tree trial 32/100: val macro-F1 0.740, best 0.892
+  decision_tree trial 33/100: val macro-F1 0.868, best 0.892
+  decision_tree trial 34/100: val macro-F1 0.886, best 0.892
+  decision_tree trial 35/100: val macro-F1 0.819, best 0.892
+  decision_tree trial 36/100: val macro-F1 0.881, best 0.892
+  decision_tree trial 37/100: val macro-F1 0.859, best 0.892
+  decision_tree trial 38/100: val macro-F1 0.882, best 0.892
+  decision_tree trial 39/100: val macro-F1 0.749, best 0.892
+  decision_tree trial 40/100: val macro-F1 0.870, best 0.892
+  decision_tree trial 41/100: val macro-F1 0.769, best 0.892
+  decision_tree trial 42/100: val macro-F1 0.851, best 0.892
+  decision_tree trial 43/100: val macro-F1 0.870, best 0.892
+  decision_tree trial 44/100: val macro-F1 0.881, best 0.892
+  decision_tree trial 45/100: val macro-F1 0.865, best 0.892
+  decision_tree trial 46/100: val macro-F1 0.782, best 0.892
+  decision_tree trial 47/100: val macro-F1 0.782, best 0.892
+  decision_tree trial 48/100: val macro-F1 0.866, best 0.892
+  decision_tree trial 49/100: val macro-F1 0.751, best 0.892
+  decision_tree trial 50/100: val macro-F1 0.759, best 0.892
+  decision_tree trial 51/100: val macro-F1 0.794, best 0.892
+  decision_tree trial 52/100: val macro-F1 0.888, best 0.892
+  decision_tree trial 53/100: val macro-F1 0.759, best 0.892
+  decision_tree trial 54/100: val macro-F1 0.877, best 0.892
+  decision_tree trial 55/100: val macro-F1 0.839, best 0.892
+  decision_tree trial 56/100: val macro-F1 0.801, best 0.892
+  decision_tree trial 57/100: val macro-F1 0.876, best 0.892
+  decision_tree trial 58/100: val macro-F1 0.888, best 0.892
+  decision_tree trial 59/100: val macro-F1 0.883, best 0.892
+  decision_tree trial 60/100: val macro-F1 0.812, best 0.892
+  decision_tree trial 61/100: val macro-F1 0.817, best 0.892
+  decision_tree trial 62/100: val macro-F1 0.883, best 0.892
+  decision_tree trial 63/100: val macro-F1 0.851, best 0.892
+  decision_tree trial 64/100: val macro-F1 0.888, best 0.892
+  decision_tree trial 65/100: val macro-F1 0.888, best 0.892
+  decision_tree trial 66/100: val macro-F1 0.887, best 0.892
+  decision_tree trial 67/100: val macro-F1 0.888, best 0.892
+  decision_tree trial 68/100: val macro-F1 0.782, best 0.892
+  decision_tree trial 69/100: val macro-F1 0.796, best 0.892
+  decision_tree trial 70/100: val macro-F1 0.855, best 0.892
+  decision_tree trial 71/100: val macro-F1 0.768, best 0.892
+  decision_tree trial 72/100: val macro-F1 0.887, best 0.892
+  decision_tree trial 73/100: val macro-F1 0.792, best 0.892
+  decision_tree trial 74/100: val macro-F1 0.758, best 0.892
+  decision_tree trial 75/100: val macro-F1 0.871, best 0.892
+  decision_tree trial 76/100: val macro-F1 0.896, best 0.896
+  decision_tree trial 77/100: val macro-F1 0.762, best 0.896
+  decision_tree trial 78/100: val macro-F1 0.777, best 0.896
+  decision_tree trial 79/100: val macro-F1 0.802, best 0.896
+  decision_tree trial 80/100: val macro-F1 0.864, best 0.896
+  decision_tree trial 81/100: val macro-F1 0.857, best 0.896
+  decision_tree trial 82/100: val macro-F1 0.876, best 0.896
+  decision_tree trial 83/100: val macro-F1 0.859, best 0.896
+  decision_tree trial 84/100: val macro-F1 0.881, best 0.896
+  decision_tree trial 85/100: val macro-F1 0.751, best 0.896
+  decision_tree trial 86/100: val macro-F1 0.865, best 0.896
+  decision_tree trial 87/100: val macro-F1 0.835, best 0.896
+  decision_tree trial 88/100: val macro-F1 0.854, best 0.896
+  decision_tree trial 89/100: val macro-F1 0.810, best 0.896
+  decision_tree trial 90/100: val macro-F1 0.779, best 0.896
+  decision_tree trial 91/100: val macro-F1 0.898, best 0.898
+  decision_tree trial 92/100: val macro-F1 0.901, best 0.901
+  decision_tree trial 93/100: val macro-F1 0.789, best 0.901
+  decision_tree trial 94/100: val macro-F1 0.883, best 0.901
+  decision_tree trial 95/100: val macro-F1 0.787, best 0.901
+  decision_tree trial 96/100: val macro-F1 0.771, best 0.901
+  decision_tree trial 97/100: val macro-F1 0.892, best 0.901
+  decision_tree trial 98/100: val macro-F1 0.806, best 0.901
+  decision_tree trial 99/100: val macro-F1 0.879, best 0.901
+  decision_tree trial 100/100: val macro-F1 0.882, best 0.901
+               val_macro_f1  test_macro_f1  test_accuracy  trials  minutes
+model                                                                     
+decision_tree         0.901          0.798          0.857     100    5.575 
+ {'criterion': 'gini', 'max_depth': 13, 'min_samples_leaf': 1, 'max_features': 0.5, 'class_weight': None} 
+
+  random_forest trial 1/50: val macro-F1 0.768, best 0.768
+  random_forest trial 2/50: val macro-F1 0.886, best 0.886
+  random_forest trial 3/50: val macro-F1 0.804, best 0.886
+  random_forest trial 4/50: val macro-F1 0.797, best 0.886
+  random_forest trial 5/50: val macro-F1 0.689, best 0.886
+  random_forest trial 6/50: val macro-F1 0.870, best 0.886
+  random_forest trial 7/50: val macro-F1 0.708, best 0.886
+  random_forest trial 8/50: val macro-F1 0.801, best 0.886
+  random_forest trial 9/50: val macro-F1 0.906, best 0.906
+  random_forest trial 10/50: val macro-F1 0.785, best 0.906
+  random_forest trial 11/50: val macro-F1 0.897, best 0.906
+  random_forest trial 12/50: val macro-F1 0.895, best 0.906
+  random_forest trial 13/50: val macro-F1 0.899, best 0.906
+  random_forest trial 14/50: val macro-F1 0.901, best 0.906
+  random_forest trial 15/50: val macro-F1 0.897, best 0.906
+  random_forest trial 16/50: val macro-F1 0.898, best 0.906
+  random_forest trial 17/50: val macro-F1 0.882, best 0.906
+  random_forest trial 18/50: val macro-F1 0.906, best 0.906
+  random_forest trial 19/50: val macro-F1 0.899, best 0.906
+  random_forest trial 20/50: val macro-F1 0.887, best 0.906
+  random_forest trial 21/50: val macro-F1 0.904, best 0.906
+  random_forest trial 22/50: val macro-F1 0.784, best 0.906
+  random_forest trial 23/50: val macro-F1 0.900, best 0.906
+  random_forest trial 24/50: val macro-F1 0.898, best 0.906
+  random_forest trial 25/50: val macro-F1 0.770, best 0.906
+  random_forest trial 26/50: val macro-F1 0.898, best 0.906
+  random_forest trial 27/50: val macro-F1 0.895, best 0.906
+  random_forest trial 28/50: val macro-F1 0.897, best 0.906
+  random_forest trial 29/50: val macro-F1 0.881, best 0.906
+  random_forest trial 30/50: val macro-F1 0.902, best 0.906
+  random_forest trial 31/50: val macro-F1 0.894, best 0.906
+  random_forest trial 32/50: val macro-F1 0.901, best 0.906
+  random_forest trial 33/50: val macro-F1 0.903, best 0.906
+  random_forest trial 34/50: val macro-F1 0.900, best 0.906
+  random_forest trial 35/50: val macro-F1 0.797, best 0.906
+  random_forest trial 36/50: val macro-F1 0.880, best 0.906
+  random_forest trial 37/50: val macro-F1 0.899, best 0.906
+  random_forest trial 38/50: val macro-F1 0.892, best 0.906
+  random_forest trial 39/50: val macro-F1 0.902, best 0.906
+  random_forest trial 40/50: val macro-F1 0.904, best 0.906
+  random_forest trial 41/50: val macro-F1 0.904, best 0.906
+  random_forest trial 42/50: val macro-F1 0.907, best 0.907
+  random_forest trial 43/50: val macro-F1 0.898, best 0.907
+  random_forest trial 44/50: val macro-F1 0.892, best 0.907
+  random_forest trial 45/50: val macro-F1 0.899, best 0.907
+  random_forest trial 46/50: val macro-F1 0.905, best 0.907
+  random_forest trial 47/50: val macro-F1 0.906, best 0.907
+  random_forest trial 48/50: val macro-F1 0.905, best 0.907
+  random_forest trial 49/50: val macro-F1 0.902, best 0.907
+  random_forest trial 50/50: val macro-F1 0.903, best 0.907
+               val_macro_f1  test_macro_f1  test_accuracy  trials  minutes
+model                                                                     
+random_forest         0.907          0.807          0.856      50   20.677 
+ {'n_estimators': 100, 'max_depth': 18, 'min_samples_leaf': 4, 'max_features': 0.552468436065138, 'max_samples': 0.3732299550342789, 'class_weight': None} 
+
+  catboost trial 1/30: val macro-F1 0.878, best 0.878
+  catboost trial 2/30: val macro-F1 0.872, best 0.878
+  catboost trial 3/30: val macro-F1 0.905, best 0.905
+  catboost trial 4/30: val macro-F1 0.914, best 0.914
+  catboost trial 5/30: val macro-F1 0.894, best 0.914
+  catboost trial 6/30: val macro-F1 0.914, best 0.914
+  catboost trial 7/30: val macro-F1 0.889, best 0.914
+  catboost trial 8/30: val macro-F1 0.882, best 0.914
+  catboost trial 9/30: val macro-F1 0.913, best 0.914
+  catboost trial 10/30: val macro-F1 0.909, best 0.914
+  catboost trial 11/30: val macro-F1 0.899, best 0.914
+  catboost trial 12/30: val macro-F1 0.909, best 0.914
+  catboost trial 13/30: val macro-F1 0.909, best 0.914
+  catboost trial 14/30: val macro-F1 0.889, best 0.914
+  catboost trial 15/30: val macro-F1 0.896, best 0.914
+  catboost trial 16/30: val macro-F1 0.901, best 0.914
+  catboost trial 17/30: val macro-F1 0.906, best 0.914
+  catboost trial 18/30: val macro-F1 0.902, best 0.914
+  catboost trial 19/30: val macro-F1 0.882, best 0.914
+  catboost trial 20/30: val macro-F1 0.895, best 0.914
+  catboost trial 21/30: val macro-F1 0.909, best 0.914
+  catboost trial 22/30: val macro-F1 0.906, best 0.914
+  catboost trial 23/30: val macro-F1 0.909, best 0.914
+  catboost trial 24/30: val macro-F1 0.908, best 0.914
+  catboost trial 25/30: val macro-F1 0.909, best 0.914
+  catboost trial 26/30: val macro-F1 0.916, best 0.916
+  catboost trial 27/30: val macro-F1 0.918, best 0.918
+  catboost trial 28/30: val macro-F1 0.908, best 0.918
+  catboost trial 29/30: val macro-F1 0.911, best 0.918
+  catboost trial 30/30: val macro-F1 0.911, best 0.918
+          val_macro_f1  test_macro_f1  test_accuracy  trials  minutes
+model                                                                
+catboost         0.918          0.832          0.883      30   34.659 
+ {'learning_rate': 0.08734322559228634, 'depth': 5, 'l2_leaf_reg': 1.7603658549014813, 'random_strength': 0.47318117246368235, 'subsample': 0.6387239545046638, 'auto_class_weights': 'Balanced', 'iterations': 327} 
+
+               val_macro_f1  test_macro_f1  test_accuracy  trials  minutes
+model                                                                     
+decision_tree         0.901          0.798          0.857     100    5.575
+random_forest         0.907          0.807          0.856      50   20.677
+catboost              0.918          0.832          0.883      30   34.659
+
+Recall by terrain on the test split:
+               ASPHALT  FLOORING    ICE   SNOW
+decision_tree    0.505     0.934  0.872  0.852
+random_forest    0.558     0.949  0.883  0.791
+catboost         0.632     0.941  0.925  0.828
+  trial 1/60: complete, val macro-F1 0.891, best 0.891, 0.3 min
+  trial 2/60: complete, val macro-F1 0.780, best 0.891, 0.4 min
+  trial 3/60: complete, val macro-F1 0.878, best 0.891, 0.5 min
+  trial 4/60: complete, val macro-F1 0.783, best 0.891, 0.5 min
+  trial 5/60: complete, val macro-F1 0.922, best 0.922, 0.6 min
+  trial 6/60: complete, val macro-F1 0.891, best 0.922, 0.6 min
+  trial 7/60: complete, val macro-F1 0.883, best 0.922, 0.7 min
+  trial 8/60: complete, val macro-F1 0.718, best 0.922, 0.7 min
+  trial 9/60: pruned, val macro-F1 0.696, best 0.922, 0.8 min
+  trial 10/60: pruned, val macro-F1 0.679, best 0.922, 0.8 min
+  trial 11/60: pruned, val macro-F1 0.833, best 0.922, 0.8 min
+  trial 12/60: pruned, val macro-F1 0.826, best 0.922, 0.8 min
+  trial 13/60: complete, val macro-F1 0.882, best 0.922, 0.9 min
+  trial 14/60: pruned, val macro-F1 0.738, best 0.922, 0.9 min
+  trial 15/60: pruned, val macro-F1 0.790, best 0.922, 0.9 min
+  trial 16/60: pruned, val macro-F1 0.840, best 0.922, 1.0 min
+  trial 17/60: complete, val macro-F1 0.937, best 0.937, 1.0 min
+  trial 18/60: complete, val macro-F1 0.930, best 0.937, 1.0 min
+  trial 19/60: complete, val macro-F1 0.916, best 0.937, 1.1 min
+  trial 20/60: pruned, val macro-F1 0.804, best 0.937, 1.1 min
+  trial 21/60: complete, val macro-F1 0.905, best 0.937, 1.1 min
+  trial 22/60: complete, val macro-F1 0.917, best 0.937, 1.2 min
+  trial 23/60: complete, val macro-F1 0.916, best 0.937, 1.2 min
+  trial 24/60: pruned, val macro-F1 0.839, best 0.937, 1.2 min
+  trial 25/60: complete, val macro-F1 0.897, best 0.937, 1.2 min
+  trial 26/60: complete, val macro-F1 0.939, best 0.939, 1.3 min
+  trial 27/60: pruned, val macro-F1 0.860, best 0.939, 1.3 min
+  trial 28/60: complete, val macro-F1 0.941, best 0.941, 1.3 min
+  trial 29/60: pruned, val macro-F1 0.848, best 0.941, 1.3 min
+  trial 30/60: pruned, val macro-F1 0.861, best 0.941, 1.3 min
+  trial 31/60: complete, val macro-F1 0.931, best 0.941, 1.4 min
+  trial 32/60: complete, val macro-F1 0.919, best 0.941, 1.4 min
+  trial 33/60: complete, val macro-F1 0.932, best 0.941, 1.4 min
+  trial 34/60: pruned, val macro-F1 0.867, best 0.941, 1.4 min
+  trial 35/60: pruned, val macro-F1 0.854, best 0.941, 1.4 min
+  trial 36/60: pruned, val macro-F1 0.795, best 0.941, 1.5 min
+  trial 37/60: complete, val macro-F1 0.918, best 0.941, 1.5 min
+  trial 38/60: complete, val macro-F1 0.911, best 0.941, 1.5 min
+  trial 39/60: pruned, val macro-F1 0.884, best 0.941, 1.5 min
+  trial 40/60: complete, val macro-F1 0.937, best 0.941, 1.6 min
+  trial 41/60: complete, val macro-F1 0.937, best 0.941, 1.6 min
+  trial 42/60: complete, val macro-F1 0.922, best 0.941, 1.6 min
+  trial 43/60: complete, val macro-F1 0.922, best 0.941, 1.6 min
+  trial 44/60: complete, val macro-F1 0.939, best 0.941, 1.7 min
+  trial 45/60: pruned, val macro-F1 0.892, best 0.941, 1.7 min
+  trial 46/60: complete, val macro-F1 0.941, best 0.941, 1.7 min
+  trial 47/60: pruned, val macro-F1 0.915, best 0.941, 1.7 min
+  trial 48/60: pruned, val macro-F1 0.908, best 0.941, 1.8 min
+  trial 49/60: complete, val macro-F1 0.925, best 0.941, 1.8 min
+  trial 50/60: complete, val macro-F1 0.939, best 0.941, 1.8 min
+  trial 51/60: complete, val macro-F1 0.944, best 0.944, 1.8 min
+  trial 52/60: complete, val macro-F1 0.938, best 0.944, 1.9 min
+  trial 53/60: complete, val macro-F1 0.958, best 0.958, 1.9 min
+  trial 54/60: pruned, val macro-F1 0.911, best 0.958, 1.9 min
+  trial 55/60: pruned, val macro-F1 0.915, best 0.958, 1.9 min
+  trial 56/60: complete, val macro-F1 0.931, best 0.958, 2.0 min
+  trial 57/60: complete, val macro-F1 0.938, best 0.958, 2.0 min
+  trial 58/60: pruned, val macro-F1 0.906, best 0.958, 2.0 min
+  trial 59/60: pruned, val macro-F1 0.914, best 0.958, 2.0 min
+  trial 60/60: pruned, val macro-F1 0.898, best 0.958, 2.1 min
+
+ {'hidden': [124, 31, 550, 19, 78], 'dropout': 0.21310546421183202, 'activation': 'silu', 'lr': 0.005035519770431701, 'weight_decay': 0.0022857872320400856, 'class_weight': 'none', 'batch': 19881, 'best_epoch': 158, 'epochs': 218}
+       val_macro_f1  test_macro_f1  test_accuracy  trials  pruned  minutes
+model                                                                     
+mlp           0.958          0.846          0.889      60      24      2.1
+
+Classification report on the test split:
+              precision    recall  f1-score   support
+
+     ASPHALT      0.710     0.639     0.673       513
+    FLOORING      0.883     0.941     0.911      2025
+         ICE      0.955     0.917     0.935      2085
+        SNOW      0.863     0.865     0.864      1433
+
+    accuracy                          0.889      6056
+   macro avg      0.853     0.840     0.846      6056
+weighted avg      0.888     0.889     0.888      6056
+

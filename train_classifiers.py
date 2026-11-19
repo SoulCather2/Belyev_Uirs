@@ -134,33 +134,13 @@ def importances(name: str, model, features: list[str]) -> pd.Series:
     return pd.Series(values / values.sum(), index=features)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stride", type=int, default=20, help="keep every n-th sample (100 Hz is highly autocorrelated)")
-    parser.add_argument("--trials", type=int, default=None, help="trials per model (default: TRIALS)")
-    parser.add_argument("--models", nargs="+", default=list(TRIALS), choices=list(MODELS))
-    parser.add_argument("--out", default=str(OUT_DIR))
-    args = parser.parse_args()
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-    pd.set_option("display.width", 200)
-    pd.set_option("display.max_columns", None)
-    out = type(OUT_DIR)(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-
-    s = make_splits(load_dataset(args.stride))
-    shares = s.shares()
-    shares.to_csv(out / "split_shares.csv")
-    sizes = pd.Series({"train": len(s.train), "val": len(s.val), "test": len(s.test)}, name="rows")
-    print(f"{len(s.features)} features, stride {args.stride}, seed {SEED}")
-    print(pd.DataFrame({"rows": sizes, "share_%": sizes / sizes.sum() * 100}).round(1))
-    print("\nSurface share inside each split, %:")
-    print(shares.round(2), "\n")
-
+def run_models(s: Splits, names: list[str], trials: int | dict[str, int], out) -> None:
+    """Tune every model on val, score it once on test and save all its results to ``out``."""
     labels = s.encoder.classes_
     summary, per_terrain = [], {}
-    for name in args.models:
+    for name in names:
         started = time.time()
-        study = tune(name, s, args.trials or TRIALS[name])
+        study = tune(name, s, trials if isinstance(trials, int) else trials[name])
         study.trials_dataframe().to_csv(out / f"{name}_trials.csv", index=False)
         model = fit(name, optuna.trial.FixedTrial(study.best_params), s)
         val_pred, test_pred = predict(model, s.x_val), predict(model, s.x_test)
@@ -204,6 +184,31 @@ def main() -> None:
     print(summary.round(3))
     print("\nRecall by terrain on the test split:")
     print(recall.round(3))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--stride", type=int, default=20, help="keep every n-th sample (100 Hz is highly autocorrelated)")
+    parser.add_argument("--trials", type=int, default=None, help="trials per model (default: TRIALS)")
+    parser.add_argument("--models", nargs="+", default=list(TRIALS), choices=list(MODELS))
+    parser.add_argument("--out", default=str(OUT_DIR))
+    args = parser.parse_args()
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    pd.set_option("display.width", 200)
+    pd.set_option("display.max_columns", None)
+    out = type(OUT_DIR)(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+
+    s = make_splits(load_dataset(args.stride))
+    shares = s.shares()
+    shares.to_csv(out / "split_shares.csv")
+    sizes = pd.Series({"train": len(s.train), "val": len(s.val), "test": len(s.test)}, name="rows")
+    print(f"{len(s.features)} features, stride {args.stride}, seed {SEED}")
+    print(pd.DataFrame({"rows": sizes, "share_%": sizes / sizes.sum() * 100}).round(1))
+    print("\nSurface share inside each split, %:")
+    print(shares.round(2), "\n")
+
+    run_models(s, args.models, args.trials or TRIALS, out)
 
 
 if __name__ == "__main__":

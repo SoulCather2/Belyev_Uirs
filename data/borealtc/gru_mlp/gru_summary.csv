@@ -1,0 +1,2 @@
+model,val_macro_f1,test_macro_f1,test_accuracy,trials,pruned,minutes
+gru,0.9728387756920948,0.8307691957606278,0.881439894319683,80,41,25.906398125489552

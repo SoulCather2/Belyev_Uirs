@@ -1,0 +1,21 @@
+{
+  "window_s": 2.0,
+  "step": 5,
+  "encoder": [
+    167,
+    412
+  ],
+  "gru_units": 20,
+  "bidirectional": false,
+  "head": [
+    48
+  ],
+  "dropout": 0.194338644844741,
+  "activation": "gelu",
+  "lr": 0.00019135880487692312,
+  "weight_decay": 0.010256162748473083,
+  "class_weight": "balanced",
+  "batch": 10368,
+  "best_epoch": 359,
+  "epochs": 399
+}

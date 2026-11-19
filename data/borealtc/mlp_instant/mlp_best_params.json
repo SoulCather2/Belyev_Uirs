@@ -1,0 +1,14 @@
+{
+  "hidden": [
+    776,
+    286
+  ],
+  "dropout": 0.2958668589888992,
+  "activation": "tanh",
+  "lr": 0.006130433319983083,
+  "weight_decay": 4.823310944305628e-05,
+  "class_weight": "none",
+  "batch": 19881,
+  "best_epoch": 247,
+  "epochs": 307
+}
